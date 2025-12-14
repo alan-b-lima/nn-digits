@@ -1,0 +1,47 @@
+import Canvas, { AltBrush, MainBrush } from "./canvas.js";
+import { AsyncTry } from "./module/errors/try.js";
+import jsxmm from "./module/jsxmm/element.js";
+import "./wasm/wasm_exec.js";
+async function main() {
+    await start_go();
+    const canvas = document.querySelector("#canvas");
+    if (canvas === null) {
+        throw new Error("there must be a #canvas element");
+    }
+    const draw = new Canvas(canvas, identify);
+    const brush_input = document.querySelector("#brush");
+    if (brush_input !== null) {
+        brush_input.addEventListener("click", () => {
+            if (brush_input.classList.contains("alt")) {
+                draw.SetBrush(MainBrush);
+            }
+            else {
+                draw.SetBrush(AltBrush);
+            }
+            brush_input.classList.toggle("alt");
+        });
+    }
+    const clear_input = document.querySelector("#clear");
+    if (clear_input !== null) {
+        clear_input.addEventListener("click", Canvas.prototype.Reset.bind(draw));
+    }
+    const result_input = document.querySelector("#result");
+    if (result_input === null) {
+        throw new Error("there must be a #result element");
+    }
+    const outputs = draw.Outputs();
+    for (let i = 0; i < outputs.length; i++) {
+        result_input.append(jsxmm.Element("label", { className: "result", textContent: `${i + 1}` }, outputs[i]));
+    }
+}
+async function start_go() {
+    const [response, error] = await AsyncTry(() => fetch("./script/wasm/main.wasm"));
+    if (error !== null) {
+        throw new Error("Go Wasm module not found");
+    }
+    const go = new Go();
+    const result = await WebAssembly.instantiateStreaming(response, go.importObject);
+    go.run(result.instance);
+}
+window.addEventListener("DOMContentLoaded", main, { once: true });
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoibWFpbi5qcyIsInNvdXJjZVJvb3QiOiIiLCJzb3VyY2VzIjpbIi4uLy4uL3NyYy9tYWluLnRzIl0sIm5hbWVzIjpbXSwibWFwcGluZ3MiOiJBQUFBLE9BQU8sTUFBTSxFQUFFLEVBQUUsUUFBUSxFQUFFLFNBQVMsRUFBRSxNQUFNLGFBQWEsQ0FBQTtBQUN6RCxPQUFPLEVBQUUsUUFBUSxFQUFFLE1BQU0sd0JBQXdCLENBQUE7QUFDakQsT0FBTyxLQUFLLE1BQU0sMkJBQTJCLENBQUE7QUFDN0MsT0FBTyxxQkFBcUIsQ0FBQTtBQUk1QixLQUFLLFVBQVUsSUFBSTtJQUNmLE1BQU0sUUFBUSxFQUFFLENBQUE7SUFFaEIsTUFBTSxNQUFNLEdBQUcsUUFBUSxDQUFDLGFBQWEsQ0FBb0IsU0FBUyxDQUFDLENBQUE7SUFDbkUsSUFBSSxNQUFNLEtBQUssSUFBSSxFQUFFLENBQUM7UUFDbEIsTUFBTSxJQUFJLEtBQUssQ0FBQyxpQ0FBaUMsQ0FBQyxDQUFBO0lBQ3RELENBQUM7SUFFRCxNQUFNLElBQUksR0FBRyxJQUFJLE1BQU0sQ0FBQyxNQUFNLEVBQUUsUUFBUSxDQUFDLENBQUE7SUFFekMsTUFBTSxXQUFXLEdBQUcsUUFBUSxDQUFDLGFBQWEsQ0FBYyxRQUFRLENBQUMsQ0FBQTtJQUNqRSxJQUFJLFdBQVcsS0FBSyxJQUFJLEVBQUUsQ0FBQztRQUN2QixXQUFXLENBQUMsZ0JBQWdCLENBQUMsT0FBTyxFQUFFLEdBQUcsRUFBRTtZQUN2QyxJQUFJLFdBQVcsQ0FBQyxTQUFTLENBQUMsUUFBUSxDQUFDLEtBQUssQ0FBQyxFQUFFLENBQUM7Z0JBQ3hDLElBQUksQ0FBQyxRQUFRLENBQUMsU0FBUyxDQUFDLENBQUE7WUFDNUIsQ0FBQztpQkFBTSxDQUFDO2dCQUNKLElBQUksQ0FBQyxRQUFRLENBQUMsUUFBUSxDQUFDLENBQUE7WUFDM0IsQ0FBQztZQUVELFdBQVcsQ0FBQyxTQUFTLENBQUMsTUFBTSxDQUFDLEtBQUssQ0FBQyxDQUFBO1FBQ3ZDLENBQUMsQ0FBQyxDQUFBO0lBQ04sQ0FBQztJQUVELE1BQU0sV0FBVyxHQUFHLFFBQVEsQ0FBQyxhQUFhLENBQWMsUUFBUSxDQUFDLENBQUE7SUFDakUsSUFBSSxXQUFXLEtBQUssSUFBSSxFQUFFLENBQUM7UUFDdkIsV0FBVyxDQUFDLGdCQUFnQixDQUFDLE9BQU8sRUFBRSxNQUFNLENBQUMsU0FBUyxDQUFDLEtBQUssQ0FBQyxJQUFJLENBQUMsSUFBSSxDQUFDLENBQUMsQ0FBQTtJQUM1RSxDQUFDO0lBRUQsTUFBTSxZQUFZLEdBQUcsUUFBUSxDQUFDLGFBQWEsQ0FBYyxTQUFTLENBQUMsQ0FBQTtJQUNuRSxJQUFJLFlBQVksS0FBSyxJQUFJLEVBQUUsQ0FBQztRQUN4QixNQUFNLElBQUksS0FBSyxDQUFDLGlDQUFpQyxDQUFDLENBQUE7SUFDdEQsQ0FBQztJQUVELE1BQU0sT0FBTyxHQUFHLElBQUksQ0FBQyxPQUFPLEVBQUUsQ0FBQTtJQUM5QixLQUFLLElBQUksQ0FBQyxHQUFHLENBQUMsRUFBRSxDQUFDLEdBQUcsT0FBTyxDQUFDLE1BQU0sRUFBRSxDQUFDLEVBQUUsRUFBRSxDQUFDO1FBQ3RDLFlBQVksQ0FBQyxNQUFNLENBQ2YsS0FBSyxDQUFDLE9BQU8sQ0FBQyxPQUFPLEVBQUUsRUFBRSxTQUFTLEVBQUUsUUFBUSxFQUFFLFdBQVcsRUFBRSxHQUFHLENBQUMsR0FBRyxDQUFDLEVBQUUsRUFBRSxFQUFFLE9BQU8sQ0FBQyxDQUFDLENBQUMsQ0FBQyxDQUN2RixDQUFBO0lBQ0wsQ0FBQztBQUNMLENBQUM7QUFFRCxLQUFLLFVBQVUsUUFBUTtJQUNuQixNQUFNLENBQUMsUUFBUSxFQUFFLEtBQUssQ0FBQyxHQUFHLE1BQU0sUUFBUSxDQUFDLEdBQUcsRUFBRSxDQUFDLEtBQUssQ0FBQyx5QkFBeUIsQ0FBQyxDQUFDLENBQUE7SUFDaEYsSUFBSSxLQUFLLEtBQUssSUFBSSxFQUFFLENBQUM7UUFDakIsTUFBTSxJQUFJLEtBQUssQ0FBQywwQkFBMEIsQ0FBQyxDQUFBO0lBQy9DLENBQUM7SUFFRCxNQUFNLEVBQUUsR0FBRyxJQUFJLEVBQUUsRUFBRSxDQUFBO0lBQ25CLE1BQU0sTUFBTSxHQUFHLE1BQU0sV0FBVyxDQUFDLG9CQUFvQixDQUFDLFFBQVEsRUFBRSxFQUFFLENBQUMsWUFBWSxDQUFDLENBQUE7SUFDaEYsRUFBRSxDQUFDLEdBQUcsQ0FBQyxNQUFNLENBQUMsUUFBUSxDQUFDLENBQUE7QUFDM0IsQ0FBQztBQUVELE1BQU0sQ0FBQyxnQkFBZ0IsQ0FBQyxrQkFBa0IsRUFBRSxJQUFJLEVBQUUsRUFBRSxJQUFJLEVBQUUsSUFBSSxFQUFFLENBQUMsQ0FBQSJ9
