@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="#" type="image/x-icon">
+    <link rel="stylesheet" href="./style/index.css">
+
+    <script type="module" src="./script/main.js"></script>
+
+    <title>MNIST Handwritten Digits Example</title>
+</head>
+
+<body id="root">
+    <header id="header">
+        <h1>Identificação de Dígitos Manuscritos &ndash; Banco de dados MNIST</h2>
+    </header>
+
+    <section id="content">
+        <main id="main">
+            <div class="actions">
+                <button class="input" id="brush">Pincel</button>
+                <button class="input" id="clear">Limpar</button>
+                <!-- <button class="input" id="">Aleatório</button> -->
+            </div>
+
+            <div id="container">
+                <canvas id="canvas" width="28" height="28"></canvas>
+            </div>
+        </main>
+
+        <aside id="sidebar">
+            <h2>Resultado</h2>
+
+            <div id="result"></div>
+        </aside>
+    </section>
+
+    <footer id="footer">
+        Copyright © 2025 Alan Lima &ndash; Repositório no <a href="https://github.com/alan-b-lima/nn-digits" target="_blank" rel="noopener noreferrer">GitHub</a>
+    </footer>
+</body>
+
+</html>
