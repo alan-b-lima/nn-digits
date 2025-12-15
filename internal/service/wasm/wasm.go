@@ -14,17 +14,17 @@ type Service struct {
 	nn nn.NeuralNetwork
 }
 
-var _ serve.Identifier = &Service{}
+var _ serve.Classifier = &Service{}
 
 var errBadDimensions = errors.New("nn: request dimensions must constitute a 28x28 square")
 
-func New() serve.Identifier {
+func New() serve.Classifier {
 	return &Service{
 		nn: nn.New(28*28, 12, 13, 7, 10),
 	}
 }
 
-func (s *Service) Identify(req serve.Request) (serve.Result, error) {
+func (s *Service) Classify(req serve.Request) (serve.Result, error) {
 	if req.Width != 28 || req.Height != 28 {
 		return serve.Result{}, errBadDimensions
 	}

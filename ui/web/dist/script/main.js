@@ -8,7 +8,7 @@ async function main() {
     if (canvas === null) {
         throw new Error("there must be a #canvas element");
     }
-    const draw = new Canvas(canvas, identify);
+    const draw = new Canvas(canvas, classify);
     const brush_input = document.querySelector("#brush");
     if (brush_input !== null) {
         brush_input.addEventListener("click", () => {

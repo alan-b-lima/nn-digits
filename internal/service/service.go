@@ -1,7 +1,7 @@
 package serve
 
-type Identifier interface {
-	Identify(Request) (Result, error)
+type Classifier interface {
+	Classify(Request) (Result, error)
 }
 
 type (

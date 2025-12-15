@@ -11,14 +11,14 @@ import (
 
 func main() {
 	serve := wasm.New()
-	js.Global().Set("identify", js.FuncOf(identify(serve)))
+	js.Global().Set("classify", js.FuncOf(Classify(serve)))
 	
 	select {}
 }
 
 var Array = js.Global().Get("Array")
 
-func identify(id serve.Identifier) func(js.Value, []js.Value) any {
+func Classify(id serve.Classifier) func(js.Value, []js.Value) any {
 	return func(_ js.Value, args []js.Value) any {
 		var width, height int
 		var array []float64
@@ -50,7 +50,7 @@ func identify(id serve.Identifier) func(js.Value, []js.Value) any {
 			array[i] = val.Float()
 		}
 
-		res, err := id.Identify(serve.Request{
+		res, err := id.Classify(serve.Request{
 			Width:  width,
 			Height: height,
 			Data:   array,

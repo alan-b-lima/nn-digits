@@ -3,7 +3,7 @@ import { AsyncTry } from "./module/errors/try.js"
 import jsxmm from "./module/jsxmm/element.js"
 import "./wasm/wasm_exec.js"
 
-declare function identify(data: number[], width: number, height: number): number[] | null
+declare function classify(data: number[], width: number, height: number): number[] | null
 
 async function main(): Promise<void> {
     await start_go()
@@ -13,7 +13,7 @@ async function main(): Promise<void> {
         throw new Error("there must be a #canvas element")
     }
 
-    const draw = new Canvas(canvas, identify)
+    const draw = new Canvas(canvas, classify)
 
     const brush_input = document.querySelector<HTMLElement>("#brush")
     if (brush_input !== null) {
