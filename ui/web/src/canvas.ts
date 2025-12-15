@@ -154,6 +154,22 @@ export default class Canvas {
             this.identify()
         })
 
+        canvas.addEventListener('touchmove', (evt: TouchEvent): void => {
+            evt.preventDefault()
+
+            if (!state.down || evt.touches.length === 0) {
+                return
+            }
+
+            const touch = evt.touches[evt.touches.length - 1]
+            const rect = canvas.getBoundingClientRect()
+
+            const x = (touch.clientX - rect.left) * canvas.width / canvas.clientWidth - .5
+            const y = (touch.clientY - rect.top) * canvas.height / canvas.clientHeight - .5
+            this.stroke(x, y, BrushRadius, this.#brush)
+            this.identify()
+        })
+
         canvas.addEventListener("mousedown", (evt: MouseEvent): void => {
             if (evt.button === 0) {
                 state.brush = this.Brush()
@@ -165,6 +181,14 @@ export default class Canvas {
         })
 
         canvas.addEventListener("mouseup", (): void => {
+            state.down = false
+        })
+
+        canvas.addEventListener('touchstart', (): void => {
+            state.down = true
+        })
+
+        canvas.addEventListener('touchend', (): void => {
             state.down = false
         })
     }
