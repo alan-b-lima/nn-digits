@@ -135,6 +135,7 @@ html {
         & {
             display: grid;
             grid-template-rows: auto 1fr;
+            min-width: min(25rem, 25dvw);
             gap: 1rem;
         }
 
@@ -143,7 +144,6 @@ html {
             flex-direction: column;
             justify-content: space-between;
             pointer-events: none;
-            width: min(25rem, 25dvw);
             padding: 1rem;
         }
 
@@ -153,7 +153,7 @@ html {
         }
 
         input {
-            accent-color: var(--primary);
+            accent-color: var(--accent);
         }
     }
 
@@ -178,6 +178,17 @@ html {
 
         a:active {
             color: var(--tertiary);
+        }
+    }
+
+    @media screen and (max-width: 800px) {
+        #content {
+            grid-template-columns: unset;
+        }
+
+        #main #container #canvas {
+            height: unset;
+            width: 100%;
         }
     }
 }
