@@ -41,7 +41,7 @@ async function main(): Promise<void> {
     const outputs = draw.Outputs()
     for (let i = 0; i < outputs.length; i++) {
         result_input.append(
-            jsxmm.Element("label", { className: "result", textContent: `${i + 1}` }, outputs[i]),
+            jsxmm.Element("label", { className: "result", textContent: `${i}` }, outputs[i]),
         )
     }
 }
