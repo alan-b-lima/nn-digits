@@ -8,31 +8,30 @@ export const AltBrush = 0x000000
 
 export default class Canvas {
     #ctx: CanvasRenderingContext2D
-    #bitmap: Bitmap
+    #bitmap: AdvanceBuffer<Bitmap>
 
     #brush: number
     #outputs: HTMLInputElement[]
 
-    #identify: IdentifierFunc
-    #buffer: Array<number>
+    #classify: IdentifierFunc
 
-    constructor(canvas: HTMLCanvasElement, identify: IdentifierFunc) {
+    constructor(canvas: HTMLCanvasElement, classify: IdentifierFunc) {
         const ctx = canvas.getContext("2d")
         if (ctx === null) {
             throw new Error("2D drawing on canvas element not supported")
         }
 
         this.#ctx = ctx
-        this.#bitmap = new Bitmap(28, 28)
+        this.#bitmap = new AdvanceBuffer<Bitmap>(32)
+        this.#bitmap.Append(new Bitmap(28, 28))
 
         this.#brush = MainBrush
         this.#outputs = this.Outputs()
 
-        this.#identify = identify
-        this.#buffer = new Array(28 * 28)
+        this.#classify = classify
 
         this.setup_listeners(canvas)
-        this.identify()
+        this.classify()
     }
 
     Outputs(): HTMLInputElement[] {
@@ -54,14 +53,17 @@ export default class Canvas {
         return this.#outputs
     }
 
-    Reset() {
-        for (let x = 0; x < this.#bitmap.Width; x++) {
-            for (let y = 0; y < this.#bitmap.Height; y++) {
+    Reset(): void {
+        this.do()
+
+        const bitmap = this.#bitmap.Current()
+        for (let x = 0; x < bitmap.Width; x++) {
+            for (let y = 0; y < bitmap.Height; y++) {
                 this.set(x, y, 0)
             }
         }
 
-        this.identify()
+        this.classify()
     }
 
     Brush(): number {
@@ -72,22 +74,70 @@ export default class Canvas {
         this.#brush = brush
     }
 
-    private identify(): number[] {
+    Undo(): boolean {
+        if (this.#bitmap.Revert()) {
+            return false
+        }
+
+        const bitmap = this.#bitmap.Current()
+        for (let x = 0; x < bitmap.Width; x++) {
+            for (let y = 0; y < bitmap.Height; y++) {
+                this.set(x, y, bitmap.At(x, y))
+            }
+        }
+
+        this.classify()
+        return true
+    }
+
+    Redo(): boolean {
+        if (this.#bitmap.Advance()) {
+            return false
+        }
+
+        const bitmap = this.#bitmap.Current()
+        for (let x = 0; x < bitmap.Width; x++) {
+            for (let y = 0; y < bitmap.Height; y++) {
+                this.set(x, y, bitmap.At(x, y))
+            }
+        }
+
+        this.classify()
+        return true
+    }
+
+    #buffer?: number[]
+
+    private classify(): number[] {
+        const bitmap = this.#bitmap.Current()
+
+        if (this.#buffer === undefined) {
+            this.#buffer = new Array(bitmap.Width * bitmap.Height)
+        }
+
         let i = 0
-        for (let x = 0; x < this.#bitmap.Width; x++) {
-            for (let y = 0; y < this.#bitmap.Height; y++) {
-                const color = this.#bitmap.At(x, y)
+        for (let x = 0; x < bitmap.Width; x++) {
+            for (let y = 0; y < bitmap.Height; y++) {
+                const color = bitmap.At(x, y)
                 this.#buffer[i] = saturation(color)
                 i++
             }
         }
 
-        const result = this.#identify(this.#buffer, this.#bitmap.Width, this.#bitmap.Height)
+        const result = this.#classify(this.#buffer, bitmap.Width, bitmap.Height)
         if (result === null) {
             throw new Error("untracable error occurred")
         }
 
+        const max = Math.max(...result)
+
         for (let i = 0; i < result.length; i++) {
+            if (result[i] === max) {
+                this.#outputs[i].classList.add("classification")
+            } else {
+                this.#outputs[i].classList.remove("classification")
+            }
+
             this.#outputs[i].value = result[i].toString()
         }
 
@@ -95,21 +145,23 @@ export default class Canvas {
     }
 
     private set(x: number, y: number, color: number) {
-        this.#bitmap.Set(x, y, color)
+        this.#bitmap.Current().Set(x, y, color)
         this.#ctx.fillStyle = pixel(color)
         this.#ctx.fillRect(x, y, 1, 1)
     }
 
     private stroke(x: number, y: number, radius: number, brush: number) {
+        const bitmap = this.#bitmap.Current()
+
         const offx = Math.max(0, Math.floor(x - radius))
         const offy = Math.max(0, Math.floor(y - radius))
-        const limx = Math.min(Math.ceil(x + radius), this.#bitmap.Width - 1)
-        const limy = Math.min(Math.ceil(y + radius), this.#bitmap.Height - 1)
+        const limx = Math.min(Math.ceil(x + radius), bitmap.Width - 1)
+        const limy = Math.min(Math.ceil(y + radius), bitmap.Height - 1)
 
         for (let xi = offx; xi <= limx; xi++) {
             for (let yi = offy; yi <= limy; yi++) {
                 const color = lerp(
-                    this.#bitmap.At(xi, yi),
+                    bitmap.At(xi, yi),
                     brush,
                     Math.min(Math.hypot(xi - x, yi - y) / (radius + 1), 1),
                 )
@@ -119,24 +171,56 @@ export default class Canvas {
         }
     }
 
+    private do(): Bitmap {
+        const bitmap = this.#bitmap.Current().Copy()
+        this.#bitmap.Append(bitmap)
+        return bitmap
+    }
+
     private setup_listeners(canvas: HTMLCanvasElement) {
         const BrushRadius = 1.5
 
-        const state = {
-            down: false,
-            brush: MainBrush,
+        const brush = {
+            state: BrushUp,
+            color: MainBrush,
         }
 
+        let bitmap = this.#bitmap.Current()
+
         canvas.tabIndex = 0
-        canvas.width = this.#bitmap.Width
-        canvas.height = this.#bitmap.Height
+        canvas.width = bitmap.Width
+        canvas.height = bitmap.Height
         this.Reset()
 
+        canvas.addEventListener("keydown", (evt: KeyboardEvent): void => {
+            if (!evt.ctrlKey) {
+                return
+            }
+
+            switch (evt.key) {
+            case "z":
+                this.Undo()
+                break
+            case "y":
+                this.Redo()
+                break
+            default:
+                return
+            }
+
+            evt.preventDefault()
+        })
+
         canvas.addEventListener("click", (evt: MouseEvent): void => {
+            if (brush.state === BrushStroke) {
+                return
+            }
+            bitmap = this.do()
+
             const x = (evt.offsetX - canvas.clientLeft) * canvas.width / canvas.clientWidth - .5
             const y = (evt.offsetY - canvas.clientTop) * canvas.height / canvas.clientHeight - .5
-            this.stroke(x, y, BrushRadius, state.brush)
-            this.identify()
+            this.stroke(x, y, BrushRadius, brush.color)
+            this.classify()
         })
 
         canvas.addEventListener("contextmenu", (evt: MouseEvent): void => {
@@ -144,22 +228,24 @@ export default class Canvas {
         })
 
         canvas.addEventListener("mousemove", (evt: MouseEvent): void => {
-            if (!state.down) {
+            if (brush.state === BrushUp) {
                 return
             }
+            brush.state = BrushStroke
 
             const x = (evt.offsetX - canvas.clientLeft) * canvas.width / canvas.clientWidth - .5
             const y = (evt.offsetY - canvas.clientTop) * canvas.height / canvas.clientHeight - .5
-            this.stroke(x, y, BrushRadius, state.brush)
-            this.identify()
+            this.stroke(x, y, BrushRadius, brush.color)
+            this.classify()
         })
 
         canvas.addEventListener('touchmove', (evt: TouchEvent): void => {
             evt.preventDefault()
 
-            if (!state.down || evt.touches.length === 0) {
+            if (brush.state === BrushUp || evt.touches.length === 0) {
                 return
             }
+            brush.state = BrushStroke
 
             const touch = evt.touches[evt.touches.length - 1]
             const rect = canvas.getBoundingClientRect()
@@ -167,30 +253,126 @@ export default class Canvas {
             const x = (touch.clientX - rect.left) * canvas.width / canvas.clientWidth - .5
             const y = (touch.clientY - rect.top) * canvas.height / canvas.clientHeight - .5
             this.stroke(x, y, BrushRadius, this.#brush)
-            this.identify()
+            this.classify()
         })
 
         canvas.addEventListener("mousedown", (evt: MouseEvent): void => {
             if (evt.button === 0) {
-                state.brush = this.Brush()
+                brush.color = this.Brush()
             } else if (evt.button === 2) {
-                state.brush = 0xFFFFFF - this.Brush()
+                brush.color = 0xFFFFFF - this.Brush()
             }
 
-            state.down = true
+            bitmap = this.do()
+            brush.state = BrushDown
         })
 
         canvas.addEventListener("mouseup", (): void => {
-            state.down = false
+            setTimeout(() => { brush.state = BrushUp })
         })
 
         canvas.addEventListener('touchstart', (): void => {
-            state.down = true
+            bitmap = this.do()
+            brush.state = BrushDown
         })
 
         canvas.addEventListener('touchend', (): void => {
-            state.down = false
+            setTimeout(() => { brush.state = BrushUp })
         })
+    }
+}
+
+const BrushUp = 0
+const BrushDown = 1
+const BrushStroke = 2
+
+class AdvanceBuffer<T> {
+    #buffer: Array<T>
+    #capacity: number
+
+    #cursor: number
+    #head: number
+    #tail: number
+
+    constructor(capacity: number) {
+        this.#buffer = new Array(capacity)
+        this.#capacity = capacity
+
+        this.#cursor = -1
+        this.#head = 0
+        this.#tail = 0
+    }
+
+    get Capacity(): number {
+        return this.#capacity
+    }
+
+    get Length(): number {
+        return this.#head - this.#tail
+    }
+
+    Append(state: T): void {
+        this.#cursor++
+        this.set(state)
+
+        this.#head = this.#cursor + 1
+        if (this.Length >= this.#capacity) {
+            this.#tail = this.#head - this.#capacity
+        }
+    }
+
+    Current(): T {
+        if (this.Length === 0) {
+            return undefined as T
+        }
+
+        return this.get()
+    }
+
+    Advance(): boolean {
+        if (this.Length === 0) {
+            return false
+        }
+
+        const next = this.#cursor + 1
+        if (next < this.#head) {
+            this.#cursor = next
+        } else {
+            return false
+        }
+
+        return true
+    }
+
+    Revert(): boolean {
+        if (this.Length === 0) {
+            return false
+        }
+
+        const prev = this.#cursor - 1
+        if (prev >= this.#tail) {
+            this.#cursor = prev
+        } else {
+            return false
+        }
+
+        return true
+    }
+
+    private get(): T {
+        return this.#buffer[this.index(this.#cursor)]
+    }
+
+    private set(value: T): void {
+        this.#buffer[this.index(this.#cursor)] = value
+    }
+
+    private index(index: number): number {
+        index = index % this.#capacity
+        if (index < 0) {
+            return index + this.#capacity
+        }
+        return index
     }
 }
 
