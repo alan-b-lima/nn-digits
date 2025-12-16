@@ -15,6 +15,16 @@ async function main(): Promise<void> {
 
     const draw = new Canvas(canvas, classify)
 
+    const undo_input = document.querySelector<HTMLElement>("#undo")
+    if (undo_input !== null) {
+        undo_input.addEventListener("click", Canvas.prototype.Undo.bind(draw))
+    }
+    
+    const redo_input = document.querySelector<HTMLElement>("#redo")
+    if (redo_input !== null) {
+        redo_input.addEventListener("click", Canvas.prototype.Redo.bind(draw))
+    }
+
     const brush_input = document.querySelector<HTMLElement>("#brush")
     if (brush_input !== null) {
         brush_input.addEventListener("click", () => {
