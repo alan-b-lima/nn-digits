@@ -1,23 +1,20 @@
 package nnmath
 
-import (
-	"fmt"
-	"math/rand"
-)
+import "fmt"
 
 type Matrix struct {
-	Rows int
-	Cols int
-	Data []float64
+	rows int
+	cols int
+	data []float64
 }
 
 type Vector = Matrix
 
 func MakeMat(rows, cols int) Matrix {
 	return Matrix{
-		Rows: rows,
-		Cols: cols,
-		Data: make([]float64, rows*cols),
+		rows: rows,
+		cols: cols,
+		data: make([]float64, rows*cols),
 	}
 }
 
@@ -27,20 +24,10 @@ func MakeMatData(rows, cols int, data []float64) Matrix {
 	}
 
 	return Matrix{
-		Rows: rows,
-		Cols: cols,
-		Data: data,
+		rows: rows,
+		cols: cols,
+		data: data,
 	}
-}
-
-func MakeMatRandom(rows, cols int) Matrix {
-	M := MakeMat(rows, cols)
-
-	for i := range rows * cols {
-		M.Data[i] = rand.NormFloat64()
-	}
-
-	return M
 }
 
 func MakeVec(size int) Vector {
@@ -55,108 +42,124 @@ func MakeVecData(size int, data []float64) Vector {
 	return MakeMatData(size, 1, data)
 }
 
-func MakeVecRandom(size int) Vector {
-	V := MakeVec(size)
-
-	for i := range size {
-		V.Data[i] = rand.NormFloat64()
-	}
-
-	return V
+func (M Matrix) Size() int {
+	return M.rows * M.cols
 }
 
 func (M Matrix) Dim() (row, col int) {
-	return M.Rows, M.Cols
+	return M.rows, M.cols
+}
+
+func (M Matrix) Rows() int {
+	return M.rows
+}
+
+func (M Matrix) Cols() int {
+	return M.cols
+}
+
+func (M Matrix) Data() []float64 {
+	return M.data
 }
 
 func (M Matrix) At(row, col int) float64 {
-	if row < 0 || M.Rows <= row || col < 0 || M.Cols <= col {
-		panic(fmt.Sprintf("index out of range [%d][%d] with length %d,%d", row, col, M.Rows, M.Cols))
+	if row < 0 || M.rows <= row || col < 0 || M.cols <= col {
+		panic(fmt.Sprintf("index out of range [%d][%d] with length %d,%d", row, col, M.rows, M.cols))
 	}
 
-	return M.Data[row*M.Cols+col]
+	return M.data[row*M.cols+col]
 }
 
 func (M Matrix) Set(row, col int, value float64) {
-	if row < 0 || M.Rows <= row || col < 0 || M.Cols <= col {
-		panic(fmt.Sprintf("index out of range [%d][%d] with length %d,%d", row, col, M.Rows, M.Cols))
+	if row < 0 || M.rows <= row || col < 0 || M.cols <= col {
+		panic(fmt.Sprintf("index out of range [%d][%d] with length %d,%d", row, col, M.rows, M.cols))
 	}
 
-	M.Data[row*M.Cols+col] = value
+	M.data[row*M.cols+col] = value
 }
 
 func Add(A, B Matrix) Matrix {
-	if A.Rows != B.Rows || A.Cols != B.Cols {
-		panic("matrix dimensions do not match")
-	}
-
-	C := MakeMat(A.Rows, A.Cols)
-
-	for i := range A.Rows {
-		for j := range A.Cols {
-			C.Set(i, j, A.At(i, j)+B.At(i, j))
-		}
-	}
-
+	C := MakeMat(A.rows, A.cols)
+	AddP(C, A, B)
 	return C
 }
 
 func Mul(A, B Matrix) Matrix {
-	if A.Cols != B.Rows {
-		panic("matrix dimensions do not match")
-	}
-
-	C := MakeMat(A.Rows, B.Cols)
-
-	for i := range A.Rows {
-		for j := range B.Cols {
-			var sum float64
-			for k := range A.Cols {
-				sum += A.At(i, k) * B.At(k, j)
-			}
-			C.Set(i, j, sum)
-		}
-	}
-
+	C := MakeMat(A.rows, B.cols)
+	MulP(C, A, B)
 	return C
 }
 
 func HMul(A, B Matrix) Matrix {
-	if A.Rows != B.Rows || A.Cols != B.Cols {
-		panic("matrix dimensions do not match")
-	}
-
-	C := MakeMat(A.Rows, A.Cols)
-
-	for i := range A.Rows {
-		for j := range A.Cols {
-			C.Set(i, j, A.At(i, j)*B.At(i, j))
-		}
-	}
-
+	C := MakeMat(A.rows, A.cols)
+	HMulP(C, A, B)
 	return C
 }
 
 func SMul(s float64, A Matrix) Matrix {
-	B := MakeMat(A.Rows, A.Cols)
-
-	for i := range A.Rows {
-		for j := range A.Cols {
-			B.Set(i, j, s*A.At(i, j))
-		}
-	}
-
+	B := MakeMat(A.rows, A.cols)
+	SMulP(B, s, A)
 	return B
 }
 
 func Apply(A Matrix, fn func(float64) float64) Matrix {
-	R := MakeMat(A.Rows, A.Cols)
+	R := MakeMat(A.rows, A.cols)
+	ApplyP(R, A, fn)
+	return R
+}
 
-	for i := range A.Rows {
-		for j := range A.Cols {
-			R.Set(i, j, fn(A.At(i, j)))
-		}
+func AddP(R Matrix, A, B Matrix) {
+	if A.rows != B.rows || A.cols != B.cols || R.rows != A.rows || R.cols != A.cols {
+		panic("matrix dimensions do not match")
 	}
 
-	return R
+	for i := range len(A.data) {
+		R.data[i] = A.data[i] + B.data[i]
+	}
+}
+
+func MulP(R Matrix, A, B Matrix) {
+	if A.cols != B.rows || R.rows != A.rows || R.cols != B.cols {
+		panic("matrix dimensions do not match")
+	}
+
+	for i := range A.rows {
+		for j := range B.cols {
+			var sum float64
+			for k := range A.cols {
+				sum += A.At(i, k) * B.At(k, j)
+			}
+			R.Set(i, j, sum)
+		}
+	}
+}
+
+func HMulP(R Matrix, A, B Matrix) {
+	if A.rows != B.rows || A.cols != B.cols || R.rows != A.rows || R.cols != A.cols {
+		panic("matrix dimensions do not match")
+	}
+
+	for i := range len(A.data) {
+		R.data[i] = A.data[i] * B.data[i]
+	}
+}
+
+func SMulP(R Matrix, s float64, A Matrix) {
+	if R.rows != A.rows || R.cols != A.cols {
+		panic("matrix dimensions do not match")
+	}
+
+	for i := range len(A.data) {
+		R.data[i] = s * A.data[i]
+	}
+}
+
+func ApplyP(R Matrix, A Matrix, fn func(float64) float64) {
+	if R.rows != A.rows || R.cols != A.cols {
+		panic("matrix dimensions do not match")
+	}
+
+	for i := range len(A.data) {
+		R.data[i] = fn(A.data[i])
+	}
 }
