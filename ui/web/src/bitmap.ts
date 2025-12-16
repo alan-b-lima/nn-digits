@@ -3,7 +3,7 @@ export default class Bitmap {
     #heigth: number
     #data: Uint32Array
 
-    constructor(height: number, width: number) {
+    constructor(width: number, height: number) {
         this.#width = width
         this.#heigth = height
         this.#data = new Uint32Array(width * height)
@@ -25,9 +25,12 @@ export default class Bitmap {
         this.#data[y * this.#width + x] = color
     }
 
-    *[Symbol.iterator]() {
-        for (const pixel of this.#data) {
-            yield pixel            
+    Copy(): Bitmap {
+        const copy = new Bitmap(this.#width, this.#heigth)
+        for (let i = 0; i < this.#data.length; i++) {
+            copy.#data[i] = this.#data[i]
         }
+
+        return copy
     }
 }
