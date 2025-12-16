@@ -7,7 +7,7 @@
 }
 
 :is([tabindex], button, input):focus-visible {
-    outline: 3px solid var(--tertiary);
+    outline: 3px solid var(--secondary);
     outline-offset: 2px;
 }
 
@@ -15,10 +15,10 @@
     --dark: #0b0b03;
     --light: #fcfcf5;
 
-    --primary: #ceafea;
-    --secondary: #f1ebeb;
-    --tertiary: #c1a7c4;
-    --accent: #9869ce;
+    --primary: #f1ebeb;
+    --secondary: #ceafea;
+    --tertiary: #9869ce;
+    --accent: #308a48;
 
     --border: 2px solid var(--dark);
     --border-no-color: 2px solid;
@@ -26,7 +26,7 @@
 
 html {
     font-family: "Consolas", "Courier New", Courier, monospace;
-    background-color: var(--secondary);
+    background-color: var(--primary);
     color: var(--dark);
 }
 
@@ -49,11 +49,11 @@ html {
         }
 
         &:hover {
-            background-color: var(--secondary);
+            background-color: var(--primary);
         }
 
         &:active {
-            background-color: var(--tertiary);
+            background-color: var(--secondary);
         }
     }
 
@@ -101,12 +101,12 @@ html {
 
                 &:hover {
                     background-color: var(--dark);
-                    color: var(--secondary);
+                    color: var(--primary);
                 }
 
                 &:active {
                     background-color: var(--dark);
-                    color: var(--tertiary);
+                    color: var(--secondary);
                 }
             }
         }
@@ -122,7 +122,7 @@ html {
             }
 
             #canvas {
-                background-color: var(--primary);
+                background-color: var(--secondary);
                 image-rendering: pixelated;
                 cursor: crosshair;
                 border-radius: .5rem;
@@ -152,8 +152,14 @@ html {
             grid-template-columns: 4ch 1fr;
         }
 
-        input {
-            accent-color: var(--accent);
+        input[type="range"] {
+            & {
+                accent-color: var(--tertiary);
+            }
+
+            &.classification {
+                accent-color: var(--accent);
+            }
         }
     }
 
@@ -162,7 +168,7 @@ html {
             text-align: center;
             background-color: var(--dark);
             border-radius: 1rem 1rem 0 0;
-            border-bottom: none;
+            padding: .5rem 1rem;
             color: var(--light);
             padding: .5rem;
         }
@@ -173,11 +179,11 @@ html {
         }
 
         a:hover {
-            color: var(--secondary);
+            color: var(--primary);
         }
 
         a:active {
-            color: var(--tertiary);
+            color: var(--secondary);
         }
     }
 
