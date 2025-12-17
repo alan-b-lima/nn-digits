@@ -90,6 +90,7 @@ html {
             & {
                 display: flex;
                 justify-content: end;
+                flex-wrap: wrap;
                 gap: .5rem;
             }
 

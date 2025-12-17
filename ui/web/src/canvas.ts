@@ -53,6 +53,14 @@ export default class Canvas {
         return this.#outputs
     }
 
+    Brush(): number {
+        return this.#brush
+    }
+
+    SetBrush(brush: number): void {
+        this.#brush = brush
+    }
+
     Reset(): void {
         this.do()
 
@@ -66,44 +74,34 @@ export default class Canvas {
         this.classify()
     }
 
-    Brush(): number {
-        return this.#brush
-    }
-
-    SetBrush(brush: number): void {
-        this.#brush = brush
-    }
-
     Undo(): boolean {
-        if (this.#bitmap.Revert()) {
+        if (!this.#bitmap.Revert()) {
             return false
         }
 
-        const bitmap = this.#bitmap.Current()
-        for (let x = 0; x < bitmap.Width; x++) {
-            for (let y = 0; y < bitmap.Height; y++) {
-                this.set(x, y, bitmap.At(x, y))
-            }
-        }
-
-        this.classify()
+        this.redraw()
         return true
     }
 
     Redo(): boolean {
-        if (this.#bitmap.Advance()) {
+        if (!this.#bitmap.Advance()) {
             return false
         }
 
+        this.redraw()
+        return true
+    }
+
+    redraw(): void {
         const bitmap = this.#bitmap.Current()
         for (let x = 0; x < bitmap.Width; x++) {
             for (let y = 0; y < bitmap.Height; y++) {
-                this.set(x, y, bitmap.At(x, y))
+                this.#ctx.fillStyle = pixel(bitmap.At(x, y))
+                this.#ctx.fillRect(x, y, 1, 1)
             }
         }
 
         this.classify()
-        return true
     }
 
     #buffer?: number[]
@@ -239,7 +237,7 @@ export default class Canvas {
             this.classify()
         })
 
-        canvas.addEventListener('touchmove', (evt: TouchEvent): void => {
+        canvas.addEventListener("touchmove", (evt: TouchEvent): void => {
             evt.preventDefault()
 
             if (brush.state === BrushUp || evt.touches.length === 0) {
@@ -263,20 +261,34 @@ export default class Canvas {
                 brush.color = 0xFFFFFF - this.Brush()
             }
 
-            bitmap = this.do()
-            brush.state = BrushDown
+            if (brush.state === BrushUp) {
+                bitmap = this.do()
+                brush.state = BrushDown
+            }
         })
 
         canvas.addEventListener("mouseup", (): void => {
+            if (brush.state !== BrushStroke) {
+                this.#bitmap.Revert()
+            }
             setTimeout(() => { brush.state = BrushUp })
         })
 
-        canvas.addEventListener('touchstart', (): void => {
-            bitmap = this.do()
-            brush.state = BrushDown
+        canvas.addEventListener("touchstart", (evt: TouchEvent): void => {
+            evt.preventDefault()
+
+            if (brush.state === BrushUp) {
+                bitmap = this.do()
+                brush.state = BrushDown
+            }
         })
 
-        canvas.addEventListener('touchend', (): void => {
+        canvas.addEventListener("touchend", (evt: TouchEvent): void => {
+            evt.preventDefault()
+
+            if (brush.state !== BrushStroke) {
+                this.#bitmap.Revert()
+            }
             setTimeout(() => { brush.state = BrushUp })
         })
     }
