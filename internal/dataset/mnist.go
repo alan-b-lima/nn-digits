@@ -6,7 +6,7 @@ import (
 	"io"
 	"strconv"
 
-	"github.com/alan-b-lima/nn-digits/internal/nn"
+	nn "github.com/alan-b-lima/nn-digits/internal/neural_network"
 	"github.com/alan-b-lima/nn-digits/pkg/nnmath"
 )
 
