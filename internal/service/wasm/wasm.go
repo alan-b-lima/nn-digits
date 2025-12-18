@@ -36,5 +36,10 @@ func (s *Service) Classify(req serve.Request) (serve.Result, error) {
 	mat := nnmath.MakeVecData(28*28, req.Data)
 	res := s.nn.FeedForward(mat)
 
-	return serve.Result(res.Data), nil
+	data := res.Data()
+	if len(data) != 10 {
+		return serve.Result{}, errBadDimensions
+	}
+
+	return serve.Result(data), nil
 }
