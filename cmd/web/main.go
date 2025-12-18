@@ -3,43 +3,56 @@
 package main
 
 import (
+	"encoding/json"
 	"syscall/js"
 
-	serve "github.com/alan-b-lima/nn-digits/internal/service"
-	"github.com/alan-b-lima/nn-digits/internal/service/wasm"
+	"github.com/alan-b-lima/nn-digits/internal/neural_network"
+	"github.com/alan-b-lima/nn-digits/internal/service"
 )
 
 func main() {
-	serve := wasm.New()
-	js.Global().Set("classify", js.FuncOf(Classify(serve)))
-	
+	var nn nn.NeuralNetwork
+
+	js.Global().Set("load", js.FuncOf(Load(&nn)))
+	js.Global().Set("classify", js.FuncOf(Classify(service.NewClassifier(&nn))))
 	select {}
 }
 
 var Array = js.Global().Get("Array")
 
-func Classify(id serve.Classifier) func(js.Value, []js.Value) any {
+func Load(nn *nn.NeuralNetwork) func(js.Value, []js.Value) any {
 	return func(_ js.Value, args []js.Value) any {
-		var width, height int
-		var array []float64
+		var arg js.Value
 
+		if arg = args[0]; arg.Type() != js.TypeString {
+			return nil
+		}
+		j := arg.String()
+
+		err := json.Unmarshal([]byte(j), nn)
+		return err == nil
+	}
+}
+
+func Classify(id service.Classifier) func(js.Value, []js.Value) any {
+	return func(_ js.Value, args []js.Value) any {
 		var arg js.Value
 
 		if arg = args[1]; arg.Type() != js.TypeNumber {
 			return nil
 		}
-		width = arg.Int()
+		width := arg.Int()
 
 		if arg = args[2]; arg.Type() != js.TypeNumber {
 			return nil
 		}
-		height = arg.Int()
+		height := arg.Int()
 
 		if arg = args[0]; arg.Type() != js.TypeObject || !arg.InstanceOf(Array) {
 			return nil
 		}
 		length := arg.Get("length").Int()
-		array = make([]float64, length)
+		array := make([]float64, length)
 
 		for i := range length {
 			val := arg.Index(i)
@@ -50,7 +63,7 @@ func Classify(id serve.Classifier) func(js.Value, []js.Value) any {
 			array[i] = val.Float()
 		}
 
-		res, err := id.Classify(serve.Request{
+		res, err := id.Classify(service.Request{
 			Width:  width,
 			Height: height,
 			Data:   array,
