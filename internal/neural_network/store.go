@@ -28,9 +28,11 @@ type neural_network struct {
 }
 
 type layer struct {
-	Weights    matrix `json:"weights"`
-	Biases     matrix `json:"biases"`
-	Activation matrix `json:"-"`
+	Weights        matrix `json:"weights"`
+	Biases         matrix `json:"biases"`
+	Activation     matrix `json:"activation"`
+	WeightGradient matrix `json:"weight_gradient"`
+	BiasGradient   matrix `json:"bias_gradient"`
 }
 
 type matrix struct {
@@ -63,6 +65,7 @@ func (m *nums) UnmarshalJSON(buf []byte) error {
 		return err
 	}
 
+	*m = make(nums, 0, len(bytes)/8)
 	for len(bytes) > 0 {
 		n := binary.LittleEndian.Uint64(bytes)
 		*m = append(*m, math.Float64frombits(n))
