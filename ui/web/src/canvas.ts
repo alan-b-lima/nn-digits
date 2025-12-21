@@ -5,12 +5,14 @@ type IdentifierFunc = (data: number[], width: number, height: number) => number[
 
 export const MainBrush = 0xFFFFFF
 export const AltBrush = 0x000000
+export const BrushRadius = 1
 
 export default class Canvas {
     #ctx: CanvasRenderingContext2D
     #bitmap: AdvanceBuffer<Bitmap>
 
     #brush: number
+    #radius: number
     #outputs: HTMLInputElement[]
 
     #classify: IdentifierFunc
@@ -26,6 +28,7 @@ export default class Canvas {
         this.#bitmap.Append(new Bitmap(28, 28))
 
         this.#brush = MainBrush
+        this.#radius = BrushRadius
         this.#outputs = this.Outputs()
 
         this.#classify = classify
@@ -59,6 +62,14 @@ export default class Canvas {
 
     SetBrush(brush: number): void {
         this.#brush = brush
+    }
+
+    Radius(): number {
+        return this.#radius
+    }
+
+    SetRadius(radius: number): void {
+        this.#radius = Math.abs(radius)
     }
 
     Reset(): void {
@@ -176,8 +187,6 @@ export default class Canvas {
     }
 
     private setup_listeners(canvas: HTMLCanvasElement) {
-        const BrushRadius = 1.5
-
         const brush = {
             state: BrushUp,
             color: MainBrush,
@@ -217,7 +226,7 @@ export default class Canvas {
 
             const x = (evt.offsetX - canvas.clientLeft) * canvas.width / canvas.clientWidth - .5
             const y = (evt.offsetY - canvas.clientTop) * canvas.height / canvas.clientHeight - .5
-            this.stroke(x, y, BrushRadius, brush.color)
+            this.stroke(x, y, this.#radius, brush.color)
             this.classify()
         })
 
@@ -233,7 +242,7 @@ export default class Canvas {
 
             const x = (evt.offsetX - canvas.clientLeft) * canvas.width / canvas.clientWidth - .5
             const y = (evt.offsetY - canvas.clientTop) * canvas.height / canvas.clientHeight - .5
-            this.stroke(x, y, BrushRadius, brush.color)
+            this.stroke(x, y, this.#radius, brush.color)
             this.classify()
         })
 
@@ -250,7 +259,7 @@ export default class Canvas {
 
             const x = (touch.clientX - rect.left) * canvas.width / canvas.clientWidth - .5
             const y = (touch.clientY - rect.top) * canvas.height / canvas.clientHeight - .5
-            this.stroke(x, y, BrushRadius, this.#brush)
+            this.stroke(x, y, this.#radius, this.#brush)
             this.classify()
         })
 
@@ -267,7 +276,11 @@ export default class Canvas {
             }
         })
 
-        canvas.addEventListener("mouseup", (): void => {
+        window.addEventListener("mouseup", (): void => {
+            if (brush.state === BrushUp) {
+                return
+            }
+            
             if (brush.state !== BrushStroke) {
                 this.#bitmap.Revert()
             }

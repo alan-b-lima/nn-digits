@@ -17,6 +17,10 @@ namespace jsxmm {
         replace(element.style, style)
     }
 
+    export function Assign<T extends HTMLElement>(element: T, properties: Partial2<T>): void {
+        replace(element, properties)
+    }
+
     function replace(base: Record<PropertyKey, any>, replacement: Record<PropertyKey, any>): void {
         for (const key in replacement) {
             if (!(key in base)) {

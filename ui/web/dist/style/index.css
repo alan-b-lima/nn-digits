@@ -1,6 +1,8 @@
 * {
     margin: 0;
+    border: none;
     padding: 0;
+    background: none;
 
     font: inherit;
     color: inherit;
@@ -94,20 +96,45 @@ html {
                 gap: .5rem;
             }
 
-            #brush.alt {
+            #brush {
                 & {
-                    background-color: var(--dark);
-                    color: var(--light);
+                    display: grid;
+                    background-color: unset;
+                    color: unset;
                 }
 
-                &:hover {
-                    background-color: var(--dark);
-                    color: var(--primary);
+                &:not(.alt) {
+                    & {
+                        background-color: var(--light);
+                    }
+
+                    &:hover:has(#radius:not(:hover)) {
+                        background-color: var(--primary);
+                    }
+
+                    &:active:has(#radius:not(:active)) {
+                        background-color: var(--secondary);
+                    }
                 }
 
-                &:active {
-                    background-color: var(--dark);
-                    color: var(--secondary);
+                &.alt {
+                    & {
+                        background-color: var(--dark);
+                        color: var(--light);
+                    }
+
+                    &:hover:has(#radius:not(:hover)) {
+                        color: var(--primary);
+                    }
+
+                    &:active:has(#radius:not(:active)) {
+                        color: var(--secondary);
+                    }
+                }
+
+                #radius {
+                    width: 5rem;
+                    accent-color: var(--tertiary);
                 }
             }
         }
