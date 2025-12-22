@@ -13,16 +13,21 @@ import (
 // NeuralNetwork is not concurrent safe, due to pre-allocation of buffers for
 // computations.
 type NeuralNetwork struct {
-	layers []Layer
+	Layers []Layer
+	buf    []float64
 }
 
 type Layer struct {
 	Weights nnmath.Matrix
 	Biases  nnmath.Vector
 
-	activation      nnmath.Vector
-	weight_gradient nnmath.Matrix
-	bias_gradient   nnmath.Vector
+	Computation
+}
+
+type Computation struct {
+	Activation     nnmath.Vector
+	WeightGradient nnmath.Matrix
+	BiasGradient   nnmath.Vector
 }
 
 func New(dims ...int) NeuralNetwork {
@@ -30,30 +35,44 @@ func New(dims ...int) NeuralNetwork {
 		panic("there must be at least two layers")
 	}
 
-	layers := make([]Layer, len(dims)-1)
-
 	var size int
 	for i := range len(dims) - 1 {
 		size += dims[i+1]*dims[i] + dims[i+1]
 		size += dims[i+1] + dims[i+1]*dims[i] + dims[i+1]
 	}
 
-	buf := make([]float64, size)
-	for i := range len(buf) {
-		buf[i] = rand.NormFloat64()
+	nn := NeuralNetwork{buf: make([]float64, size)}
+	for i := range len(nn.buf) {
+		nn.buf[i] = rand.NormFloat64()
 	}
 
-	for i := range len(dims) - 1 {
-		layers[i] = Layer{
-			Weights:         nnmath.MakeMatData(dims[i+1], dims[i], take(&buf, dims[i+1]*dims[i])),
-			Biases:          nnmath.MakeVecData(dims[i+1], take(&buf, dims[i+1])),
-			activation:      nnmath.MakeVecData(dims[i+1], take(&buf, dims[i+1])),
-			weight_gradient: nnmath.MakeMatData(dims[i+1], dims[i], take(&buf, dims[i+1]*dims[i])),
-			bias_gradient:   nnmath.MakeVecData(dims[i+1], take(&buf, dims[i+1])),
-		}
+	nn.Layers = slice_nn(nn.buf, dims...)
+	return nn
+}
+
+func (nn *NeuralNetwork) FeedForward(input nnmath.Vector) nnmath.Vector {
+	if len(nn.Layers) == 0 {
+		return nnmath.Vector{}
 	}
 
-	return NeuralNetwork{layers: layers}
+	for i := range nn.Layers[:len(nn.Layers)-1] {
+		layer := &nn.Layers[i]
+
+		nnmath.MulP(layer.Activation, layer.Weights, input)
+		nnmath.AddP(layer.Activation, layer.Activation, layer.Biases)
+		nnmath.ApplyP(layer.Activation, layer.Activation, Sigmoid)
+
+		input = nn.Layers[i].Activation
+	}
+
+	last := nn.Layers[len(nn.Layers)-1]
+
+	nnmath.MulP(last.Activation, last.Weights, input)
+	nnmath.AddP(last.Activation, last.Activation, last.Biases)
+	input = last.Activation
+
+	nnmath.Softmax(input.Data(), math.Exp)
+	return last.Activation
 }
 
 func Sigmoid(x float64) float64 {
@@ -69,31 +88,23 @@ func SigmoidDerivativeFromActivation(x float64) float64 {
 	return x * (1 - x)
 }
 
-func (nn *NeuralNetwork) FeedForward(input nnmath.Vector) nnmath.Vector {
-	if len(nn.layers) == 0 {
-		return nnmath.Vector{}
+func slice_nn(buf []float64, dims ...int) []Layer {
+	layers := make([]Layer, 0, len(dims)-1)
+	for i := range len(dims) - 1 {
+		layer := Layer{
+			Weights: nnmath.MakeMatData(dims[i+1], dims[i], take(&buf, dims[i+1]*dims[i])),
+			Biases:  nnmath.MakeVecData(dims[i+1], take(&buf, dims[i+1])),
+			Computation: Computation{
+				Activation:     nnmath.MakeVecData(dims[i+1], take(&buf, dims[i+1])),
+				WeightGradient: nnmath.MakeMatData(dims[i+1], dims[i], take(&buf, dims[i+1]*dims[i])),
+				BiasGradient:   nnmath.MakeVecData(dims[i+1], take(&buf, dims[i+1])),
+			},
+		}
+
+		layers = append(layers, layer)
 	}
 
-	for i := range nn.layers[:len(nn.layers)-1] {
-		layer := &nn.layers[i]
-
-		nnmath.MulP(layer.activation, layer.Weights, input)
-		nnmath.AddP(layer.activation, layer.activation, layer.Biases)
-		nnmath.ApplyP(layer.activation, layer.activation, Sigmoid)
-
-		input = nn.layers[i].activation
-	}
-
-	last := nn.layers[len(nn.layers)-1]
-
-	nnmath.MulP(last.activation, last.Weights, input)
-	nnmath.AddP(last.activation, last.activation, last.Biases)
-	input = last.activation
-
-	softmax := nnmath.Softmax(input.Data(), math.Exp)
-	last.activation = nnmath.MakeVecData(len(softmax), softmax)
-
-	return last.activation
+	return layers
 }
 
 func take[E any](s *[]E, len int) []E {
