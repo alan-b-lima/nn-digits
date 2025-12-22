@@ -6,39 +6,41 @@ import (
 	"encoding/json"
 	"errors"
 	"math"
-	"unsafe"
 )
 
 func (nn NeuralNetwork) MarshalJSON() ([]byte, error) {
-	return json.Marshal(*(*neural_network)(unsafe.Pointer(&nn)))
+	if len(nn.Layers) == 0 {
+		return []byte("{}"), nil
+	}
+
+	jn := neural_network{
+		Dimensions: make([]int, 0, len(nn.Layers)+1),
+		Layers:     nn.buf,
+	}
+
+	jn.Dimensions = append(jn.Dimensions, nn.Layers[0].Weights.Cols())
+	for _, layer := range nn.Layers {
+		jn.Dimensions = append(jn.Dimensions, layer.Weights.Rows())
+	}
+
+	return json.Marshal(jn)
 }
 
 func (nn *NeuralNetwork) UnmarshalJSON(buf []byte) error {
-	var vn neural_network
-	if err := json.Unmarshal(buf, &vn); err != nil {
+	var jn neural_network
+	if err := json.Unmarshal(buf, &jn); err != nil {
 		return err
 	}
 
-	*nn = *(*NeuralNetwork)(unsafe.Pointer(&vn))
+	*nn = NeuralNetwork{buf: jn.Layers}
+	nn.Layers = slice_nn(nn.buf, jn.Dimensions...)
+
 	return nil
 }
 
 type neural_network struct {
-	Layers []layer `json:"layers"`
-}
-
-type layer struct {
-	Weights        matrix `json:"weights"`
-	Biases         matrix `json:"biases"`
-	Activation     matrix `json:"activation"`
-	WeightGradient matrix `json:"weight_gradient"`
-	BiasGradient   matrix `json:"bias_gradient"`
-}
-
-type matrix struct {
-	Rows int  `json:"rows"`
-	Cols int  `json:"cols"`
-	Data nums `json:"data"`
+	Dimensions []int `json:"dimensions"`
+	Layers     nums  `json:"layers"`
 }
 
 type nums []float64
