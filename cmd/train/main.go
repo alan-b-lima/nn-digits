@@ -60,6 +60,32 @@ REPLoop:
 			l.LearnBatch(size)
 			unsaved = true
 
+		case "cycle":
+			if len(args) < 3 {
+				fmt.Println("batch size and iterations must be given")
+				break
+			}
+
+			size, err := strconv.Atoi(args[1])
+			if err != nil {
+				fmt.Println(err)
+				break
+			}
+
+			iterations, err := strconv.Atoi(args[2])
+			if err != nil {
+				fmt.Println(err)
+				break
+			}
+
+			for i := range iterations {
+				fmt.Printf("\r%d/%d", i+1, iterations)
+				l.LearnBatch(size)
+			}
+
+			fmt.Println()
+			unsaved = true
+
 		case "status":
 			total := len(l.Tests)
 			correct, cost := l.Status()
