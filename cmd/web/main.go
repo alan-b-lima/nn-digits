@@ -6,15 +6,16 @@ import (
 	"encoding/json"
 	"syscall/js"
 
+	"github.com/alan-b-lima/nn-digits/internal/digits"
 	"github.com/alan-b-lima/nn-digits/internal/neural_network"
-	"github.com/alan-b-lima/nn-digits/internal/service"
 )
 
 func main() {
 	var nn nn.NeuralNetwork
 
 	js.Global().Set("load", js.FuncOf(Load(&nn)))
-	js.Global().Set("classify", js.FuncOf(Classify(service.NewClassifier(&nn))))
+	js.Global().Set("classify", js.FuncOf(Classify(digits.NewClassifier(&nn))))
+
 	select {}
 }
 
@@ -34,40 +35,28 @@ func Load(nn *nn.NeuralNetwork) func(js.Value, []js.Value) any {
 	}
 }
 
-func Classify(id service.Classifier) func(js.Value, []js.Value) any {
+func Classify(classifier digits.Classifier) func(js.Value, []js.Value) any {
 	return func(_ js.Value, args []js.Value) any {
 		var arg js.Value
-
-		if arg = args[1]; arg.Type() != js.TypeNumber {
-			return nil
-		}
-		width := arg.Int()
-
-		if arg = args[2]; arg.Type() != js.TypeNumber {
-			return nil
-		}
-		height := arg.Int()
-
 		if arg = args[0]; arg.Type() != js.TypeObject || !arg.InstanceOf(Array) {
 			return nil
 		}
-		length := arg.Get("length").Int()
-		array := make([]float64, length)
 
-		for i := range length {
+		if arg.Get("length").Int() != len(digits.Request{}) {
+			return nil
+		}
+
+		var data digits.Request
+		for i := range len(data) {
 			val := arg.Index(i)
 			if val.Type() != js.TypeNumber {
 				return nil
 			}
 
-			array[i] = val.Float()
+			data[i] = val.Float()
 		}
 
-		res, err := id.Classify(service.Request{
-			Width:  width,
-			Height: height,
-			Data:   array,
-		})
+		res, err := classifier.Classify(data)
 		if err != nil {
 			return nil
 		}
