@@ -18,13 +18,8 @@ type (
 )
 
 type (
-	Request struct {
-		Height int
-		Width  int
-		Data   []float64
-	}
-
-	Result [10]float64
+	Request [28 * 28]float64
+	Result  [10]float64
 )
 
 type classifier struct {
@@ -33,22 +28,14 @@ type classifier struct {
 
 var _ Classifier = &classifier{}
 
-var errBadDimensions = errors.New("nn: request dimensions must constitute a 28x28 square")
+var errBadDimensions = errors.New("digits: request dimensions must constitute a 28x28 square")
 
 func NewClassifier(nn *nn.NeuralNetwork) Classifier {
 	return &classifier{nn: nn}
 }
 
 func (s *classifier) Classify(req Request) (Result, error) {
-	if req.Width != 28 || req.Height != 28 {
-		return Result{}, errBadDimensions
-	}
-
-	if len(req.Data) != 28*28 {
-		return Result{}, errBadDimensions
-	}
-
-	mat := nnmath.MakeVecData(28*28, req.Data)
+	mat := nnmath.MakeVecData(len(req), req[:])
 	res := s.nn.FeedForward(mat)
 
 	data := res.Data()
