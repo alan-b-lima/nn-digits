@@ -1,4 +1,4 @@
-package service
+package digits
 
 import (
 	"errors"
@@ -127,5 +127,5 @@ func load(path string) ([]nn.LabeledSample, error) {
 	}
 	defer f.Close()
 
-	return mnist.NewLabeledFromCSV(f)
+	return mnist.LoadFromCSV(f)
 }
