@@ -4,6 +4,7 @@ import (
 	"math"
 	"math/rand/v2"
 
+	"github.com/alan-b-lima/nn-digits/pkg/mem"
 	"github.com/alan-b-lima/nn-digits/pkg/nnmath"
 )
 
@@ -22,12 +23,17 @@ type Layer struct {
 	Biases  nnmath.Vector
 
 	Computation
+	Learning
 }
 
 type Computation struct {
-	Activation     nnmath.Vector
-	WeightGradient nnmath.Matrix
-	BiasGradient   nnmath.Vector
+	Activation nnmath.Vector
+}
+
+type Learning struct {
+	WeightGradient   nnmath.Matrix
+	BiasGradient     nnmath.Vector
+	ErrorPropagation nnmath.Vector
 }
 
 func New(dims ...int) NeuralNetwork {
@@ -35,13 +41,7 @@ func New(dims ...int) NeuralNetwork {
 		panic("there must be at least two layers")
 	}
 
-	var size int
-	for i := range len(dims) - 1 {
-		size += dims[i+1]*dims[i] + dims[i+1]
-		size += dims[i+1] + dims[i+1]*dims[i] + dims[i+1]
-	}
-
-	nn := NeuralNetwork{buf: make([]float64, size)}
+	nn := NeuralNetwork{buf: make([]float64, size_nn(dims...))}
 	for i := range len(nn.buf) {
 		nn.buf[i] = rand.NormFloat64()
 	}
@@ -88,16 +88,29 @@ func SigmoidDerivativeFromActivation(x float64) float64 {
 	return x * (1 - x)
 }
 
+func size_nn(dims ...int) int {
+	var size int
+	for i := range len(dims) - 1 {
+		size += dims[i+1]*dims[i] + dims[i+1]
+		size += dims[i+1] + dims[i+1]*dims[i] + dims[i+1] + dims[i+1]
+	}
+
+	return size
+}
+
 func slice_nn(buf []float64, dims ...int) []Layer {
 	layers := make([]Layer, 0, len(dims)-1)
 	for i := range len(dims) - 1 {
 		layer := Layer{
-			Weights: nnmath.MakeMatData(dims[i+1], dims[i], take(&buf, dims[i+1]*dims[i])),
-			Biases:  nnmath.MakeVecData(dims[i+1], take(&buf, dims[i+1])),
+			Weights: nnmath.MakeMatData(dims[i+1], dims[i], mem.Take(&buf, dims[i+1]*dims[i])),
+			Biases:  nnmath.MakeVecData(dims[i+1], mem.Take(&buf, dims[i+1])),
 			Computation: Computation{
-				Activation:     nnmath.MakeVecData(dims[i+1], take(&buf, dims[i+1])),
-				WeightGradient: nnmath.MakeMatData(dims[i+1], dims[i], take(&buf, dims[i+1]*dims[i])),
-				BiasGradient:   nnmath.MakeVecData(dims[i+1], take(&buf, dims[i+1])),
+				Activation: nnmath.MakeVecData(dims[i+1], mem.Take(&buf, dims[i+1])),
+			},
+			Learning: Learning{
+				WeightGradient:   nnmath.MakeMatData(dims[i+1], dims[i], mem.Take(&buf, dims[i+1]*dims[i])),
+				BiasGradient:     nnmath.MakeVecData(dims[i+1], mem.Take(&buf, dims[i+1])),
+				ErrorPropagation: nnmath.MakeVecData(dims[i+1], mem.Take(&buf, dims[i+1])),
 			},
 		}
 
@@ -105,10 +118,4 @@ func slice_nn(buf []float64, dims ...int) []Layer {
 	}
 
 	return layers
-}
-
-func take[E any](s *[]E, len int) []E {
-	res := (*s)[:len]
-	*s = (*s)[len:]
-	return res
 }
