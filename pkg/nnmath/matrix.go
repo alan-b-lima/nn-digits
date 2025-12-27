@@ -108,6 +108,20 @@ func Apply(A Matrix, fn func(float64) float64) Matrix {
 	return R
 }
 
+func Zero(A Matrix) {
+	for i := range len(A.data) {
+		A.data[i] = 0
+	}
+}
+
+func Assign(A Matrix, B Matrix) {
+	if A.rows != B.rows || A.cols != B.cols {
+		panic("matrix dimensions do not match")
+	}
+
+	copy(A.data, B.data)
+}
+
 func AddP(R Matrix, A, B Matrix) {
 	if A.rows != B.rows || A.cols != B.cols || R.rows != A.rows || R.cols != A.cols {
 		panic("matrix dimensions do not match")
@@ -115,6 +129,22 @@ func AddP(R Matrix, A, B Matrix) {
 
 	for i := range len(A.data) {
 		R.data[i] = A.data[i] + B.data[i]
+	}
+}
+
+func AddMulP(R Matrix, A, B, C Matrix) {
+	if B.cols != C.rows || A.rows != B.rows || A.cols != C.cols || R.rows != A.rows || R.cols != A.cols {
+		panic("matrix dimensions do not match")
+	}
+
+	for i := range B.rows {
+		for j := range C.cols {
+			sum := A.At(i, j)
+			for k := range B.cols {
+				sum += B.At(i, k) * C.At(k, j)
+			}
+			R.Set(i, j, sum)
+		}
 	}
 }
 
