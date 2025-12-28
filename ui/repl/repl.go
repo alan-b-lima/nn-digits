@@ -9,6 +9,7 @@ import (
 	"math/rand/v2"
 	"os"
 	"regexp"
+	"slices"
 	"strconv"
 
 	"github.com/alan-b-lima/nn-digits/internal/dataset"
@@ -54,6 +55,7 @@ var (
 var directives = map[string]Directive{
 	"help":   Help,
 	"new":    New,
+	"list":   List,
 	"focus":  Focus,
 	"load":   Load,
 	"store":  Store,
@@ -122,7 +124,7 @@ var (
 	ErrBadNumber        = func(err error) error { return fmt.Errorf("bad number: %w", err) }
 )
 
-func Help(state *State, w io.Writer, r io.Reader, args ...string) error {
+func Help(state *State, w io.Writer, _ io.Reader, args ...string) error {
 	fmt.Fprintln(w, help)
 	return nil
 }
@@ -168,7 +170,25 @@ func New(state *State, w io.Writer, r io.Reader, args ...string) error {
 	return nil
 }
 
-func Focus(state *State, w io.Writer, r io.Reader, args ...string) error {
+func List(state *State, w io.Writer, _ io.Reader, args ...string) error {
+	keys := make([]string, 0, len(state.ctxs))
+	for k := range state.ctxs {
+		keys = append(keys, k)
+	}
+
+	slices.Sort(keys)
+	for _, key := range keys {
+		if state.ctxs[key].Unsaved {
+			fmt.Fprintln(w, key+"*")
+		} else {
+			fmt.Fprintln(w, key)
+		}
+	}
+
+	return nil
+}
+
+func Focus(state *State, w io.Writer, _ io.Reader, args ...string) error {
 	if len(args) < 1 {
 		fmt.Fprintln(w, state.focus)
 		return nil
@@ -279,7 +299,7 @@ func Store(state *State, w io.Writer, r io.Reader, args ...string) error {
 	return nil
 }
 
-func Train(state *State, w io.Writer, r io.Reader, args ...string) error {
+func Train(state *State, w io.Writer, _ io.Reader, args ...string) error {
 	if len(args) < 1 {
 		return ErrTrainMissingArgs
 	}
@@ -300,7 +320,7 @@ func Train(state *State, w io.Writer, r io.Reader, args ...string) error {
 	return nil
 }
 
-func Cycle(state *State, w io.Writer, r io.Reader, args ...string) error {
+func Cycle(state *State, w io.Writer, _ io.Reader, args ...string) error {
 	if len(args) < 2 {
 		return ErrCycleMissingArgs
 	}
@@ -330,7 +350,7 @@ func Cycle(state *State, w io.Writer, r io.Reader, args ...string) error {
 	return nil
 }
 
-func Status(state *State, w io.Writer, r io.Reader, args ...string) error {
+func Status(state *State, w io.Writer, _ io.Reader, args ...string) error {
 	ctx := state.Focused()
 	if ctx == nil {
 		return ErrNilContext
@@ -347,7 +367,7 @@ func Status(state *State, w io.Writer, r io.Reader, args ...string) error {
 	return nil
 }
 
-func LearningRate(state *State, w io.Writer, r io.Reader, args ...string) error {
+func LearningRate(state *State, w io.Writer, _ io.Reader, args ...string) error {
 	ctx := state.Focused()
 	if ctx == nil {
 		return ErrNilContext
@@ -375,7 +395,7 @@ func Quit(state *State, w io.Writer, r io.Reader, args ...string) error {
 	for {
 		var char rune
 		fmt.Fprint(w, "There are unsaved changes, do you want to quit ([y] or n)? ")
-		n, err := fmt.Scanf("%c\n", &char)
+		n, err := fmt.Fscanf(r, "%c\n", &char)
 		if err != nil {
 			return err
 		}
@@ -465,13 +485,16 @@ func load_model(path string) (*nn.NeuralNetwork, error) {
 	return &nn, nil
 }
 
-const help = `NN Digits v0.0.1
+const help = `NN Digits v0.0.2
 
 NN Digits is an interactive shell for training a basic Multilayer Perceptron.
 
 	new <name> { <dims> }
 		creates a new neural network with the given dimensions and
 		puts it on focus.
+
+	list
+		lists all named neural networks currently available.
 
 	focus
 		shows the current focused model.
