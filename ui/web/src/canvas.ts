@@ -1,7 +1,7 @@
 import Bitmap from "./bitmap.ts"
 import jsxmm from "./module/jsxmm/element.ts"
 
-type IdentifierFunc = (data: number[], width: number, height: number) => number[] | null
+type ClassifierFunction = (data: number[]) => number[] | null
 
 export const MainBrush = 0xFFFFFF
 export const AltBrush = 0x000000
@@ -15,9 +15,9 @@ export default class Canvas {
     #radius: number
     #outputs: HTMLInputElement[]
 
-    #classify: IdentifierFunc
+    #classify: ClassifierFunction
 
-    constructor(canvas: HTMLCanvasElement, classify: IdentifierFunc) {
+    constructor(canvas: HTMLCanvasElement, classify: ClassifierFunction) {
         const ctx = canvas.getContext("2d")
         if (ctx === null) {
             throw new Error("2D drawing on canvas element not supported")
@@ -133,7 +133,10 @@ export default class Canvas {
             }
         }
 
-        const result = this.#classify(this.#buffer, bitmap.Width, bitmap.Height)
+        const result = this.#classify(this.#buffer)
+        if (result instanceof Error) {
+            throw result
+        }
         if (result === null) {
             throw new Error("untracable error occurred")
         }

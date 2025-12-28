@@ -3,28 +3,28 @@ import { AsyncTry } from "./module/errors/try.js"
 import jsxmm from "./module/jsxmm/element.js"
 import "./wasm/wasm_exec.js"
 
-declare function load(json: string): boolean
-declare function classify(data: number[], width: number, height: number): number[] | null
+declare function load(data: string): void | Error
+declare function classify(data: number[]): number[] | Error
 
 async function main(): Promise<void> {
     await start_go()
 
-    const response = await fetch("../../../.data/nn/nn-1.json")
+    const Root = root()
+
+    const response = await fetch(new URL("nn/model/digits.json", Root))
     if (!response.ok) {
-        throw new Error("failed to retrieve neural network")
+        throw new Error("retrieve neural network")
     }
 
-    const data = await response.text()
-    if (!load(data)) {
-        throw new Error("failed to retrieve neural network")
-    }
+    const neural_network = await response.text()
+    go(load)(neural_network)
 
     const canvas = document.querySelector<HTMLCanvasElement>("#canvas")
     if (canvas === null) {
         throw new Error("there must be a #canvas element")
     }
 
-    const draw = new Canvas(canvas, classify)
+    const draw = new Canvas(canvas, go(classify))
 
     const undo_input = document.querySelector<HTMLElement>("#undo")
     if (undo_input !== null) {
@@ -88,6 +88,14 @@ async function main(): Promise<void> {
     }
 }
 
+function root(): string {
+    if (location.origin === "https://alan-b-lima.github.io") {
+        return "https://alan-b-lima.github.io/nn-digits/"
+    }
+
+    return location.origin
+}
+
 async function start_go(): Promise<void> {
     const [response, error] = await AsyncTry(() => fetch("./script/wasm/main.wasm"))
     if (error !== null) {
@@ -97,6 +105,16 @@ async function start_go(): Promise<void> {
     const go = new Go()
     const result = await WebAssembly.instantiateStreaming(response, go.importObject)
     go.run(result.instance)
+}
+
+function go<T extends (...args: any) => any>(func: T): (...args: Parameters<T>) => Exclude<ReturnType<T>, Error> {
+    return function (...args: Parameters<T>): ReturnType<T> {
+        const ret = func(...args)
+        if (ret instanceof Error) {
+            throw ret
+        }
+        return ret
+    } as any
 }
 
 window.addEventListener("DOMContentLoaded", main, { once: true })
