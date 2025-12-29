@@ -79,7 +79,7 @@ func (nn *NeuralNetwork) backpropagate(dataset []LabeledSample) {
 
 			nn.SampleCostDerivative(curr.ErrorPropagation, sample)
 
-			nnmath.ApplyP(curr.Activation, curr.Activation, SigmoidDerivativeFromActivation)
+			nnmath.SoftmaxDerivativeFromActivation(curr.Activation.Data())
 			nnmath.HMulP(curr.ErrorPropagation, curr.ErrorPropagation, curr.Activation)
 
 			a := nnmath.MakeMatData(1, input.Rows(), input.Data())

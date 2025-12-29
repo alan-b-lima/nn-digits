@@ -1,11 +1,11 @@
 package nnmath
 
-type SofteningFunc func(x float64) float64
+import "math"
 
-func Softmax(values []float64, fn SofteningFunc) []float64 {
+func Softmax(values []float64) []float64 {
 	var sum float64
 	for i := range len(values) {
-		values[i] = fn(values[i])
+		values[i] = math.Exp(values[i])
 		sum += values[i]
 	}
 
@@ -16,16 +16,9 @@ func Softmax(values []float64, fn SofteningFunc) []float64 {
 	return values
 }
 
-func SoftmaxDerivative(values []float64, fn SofteningFunc) []float64 {
-	var sum float64
+func SoftmaxDerivativeFromActivation(values []float64) []float64 {
 	for i := range len(values) {
-		values[i] = fn(values[i])
-		sum += values[i]
-	}
-
-	for i := range len(values) {
-		dem := values[i] + sum
-		values[i] *= sum / (dem * dem)
+		values[i] = values[i] * (1 - values[i])
 	}
 
 	return values

@@ -58,8 +58,7 @@ func (nn *NeuralNetwork) FeedForward(input nnmath.Vector) nnmath.Vector {
 	for i := range nn.Layers[:len(nn.Layers)-1] {
 		layer := &nn.Layers[i]
 
-		nnmath.MulP(layer.Activation, layer.Weights, input)
-		nnmath.AddP(layer.Activation, layer.Activation, layer.Biases)
+		nnmath.AddMulP(layer.Activation, layer.Biases, layer.Weights, input)
 		nnmath.ApplyP(layer.Activation, layer.Activation, Sigmoid)
 
 		input = nn.Layers[i].Activation
@@ -67,11 +66,10 @@ func (nn *NeuralNetwork) FeedForward(input nnmath.Vector) nnmath.Vector {
 
 	last := nn.Layers[len(nn.Layers)-1]
 
-	nnmath.MulP(last.Activation, last.Weights, input)
-	nnmath.AddP(last.Activation, last.Activation, last.Biases)
+	nnmath.AddMulP(last.Activation, last.Biases, last.Weights, input)
+	nnmath.Softmax(last.Activation.Data())
+	
 	input = last.Activation
-
-	nnmath.Softmax(input.Data(), math.Exp)
 	return last.Activation
 }
 
