@@ -1,10 +1,10 @@
 # Recognizing Handwritten Digits
 
-This project is a simple implementation of a Neural Network to recognize handwritten digits using the MNIST dataset[^lecun][^siramdasu]. The neural network is built from scratch in Go.
+This project is a simple implementation of a Neural Network to recognize handwritten digits using the MNIST dataset[^lecun;et-al]. The neural network is built from scratch in Go.
 
-[![image](./ui/web/dist/assets/promote.png)](https://alan-b-lima.github.io/nn-digits/ui/web/dist)
+<!-- [![image](./ui/web/dist/assets/promote.png)](https://alan-b-lima.github.io/nn-digits/ui/web/dist)
 
-The canvas for test your own digits is on [GitHub Pages](https://alan-b-lima.github.io/nn-digits/ui/web/dist).
+The canvas for you to test your own hand (or mouse) written digits is on [GitHub Pages](https://alan-b-lima.github.io/nn-digits/ui/web/dist). -->
 
 # The Project
 
@@ -14,7 +14,7 @@ The goal of this project is to learn about one of the most basic forms of neural
 
 The model of neural network we'll be taking a look at is my interpretation of the _Multilayer Perceptron_[^sanderson]. The Multilayer Perceptron is defined as a tuple of the so called _layers_. We shall define those first.
 
-A layer, informally, is a group of neurons that takes an vector input and produces an vector output. The way they operate is through a variation of the Pitts-McCulloch neuron[^mcculloch;pitts]. The Pitts-McCulloch neuron follow an "all-or-none" activation principle, our neurons have _activation values_ ranging over the real numbers.
+A layer, informally, is a group of neurons that takes an vector input and produces an vector output. The way they operate is a variation of the Pitts-McCulloch neuron[^mcculloch;pitts]. The Pitts-McCulloch neuron follow an "all-or-none" activation principle, our neurons have _activation values_ ranging over the real numbers.
 
 ### Neuron
 
@@ -54,7 +54,7 @@ or:
 
 ### Neural Network
 
-A neural network is a collection of finite ordered layers $`\mathcal{N} = (L_i)`$. Notation-wise, to reference, for example, the weight matrix of of the $`L`$-th layer, we write $`\mathbf{W}^{L}`$. Note that $`m_L = n_{L - 1}`$. The _output activation vector_ of the network is $\mathbf{y} = \mathbf{a}^{|\mathcal{N}|}$, $`\mathbf{y} \in \mathcal{M}_{n_{|\mathcal{N}|} \times 1} (\mathbb{R})`$, given an input vector $`\mathbf{u} = [u_i]`$, $`\mathbf{u} \in \mathcal{M}_{m_1 \times 1} (\mathbb{R})`$, is achieved through:
+A neural network is a collection of finite ordered layers $`\mathcal{N} = (L_i)`$. Notation-wise, to reference, for example, the weight matrix of the $`L`$-th layer, we write $`\mathbf{W}^{L}`$. Note that $`m_L = n_{L - 1}`$. The _output activation vector_ of the network is $\mathbf{y} = \mathbf{a}^{|\mathcal{N}|}$, $`\mathbf{y} \in \mathcal{M}_{n_{|\mathcal{N}|} \times 1} (\mathbb{R})`$, given an input vector $`\mathbf{u} = [u_i]`$, $`\mathbf{u} \in \mathcal{M}_{m_1 \times 1} (\mathbb{R})`$, is achieved through:
 
 ```math
 \begin{align*}
@@ -111,12 +111,12 @@ C(\mathcal{N}, X) = \frac{1}{|X|} \sum_{\mathbf{x} \in X} E(\mathcal{N}, \mathbf
 
 Given a cost function, we know what to minimize. The gradient is a multidimensional derivative, if we consider a dataset $`X`$ as fixed and the weights and biases as variables (each one of them as a dimension), we can compute a vector that points in the direction of steepest ascent, negating that vector, we'll get the direction of steepest decent.
 
-Moving in the direction of steepest decent, with certain consideration, will likely cause the cost to lower, and the network to perform better. The learning rate, $`\eta \in \mathbb{R}^{+}`$, is a parameter that tries to prevent the changes to overshoot an minumal (either local or global). If $`\eta`$ is too large, the network might take too big of a step and miss a minimal point. This might be desirable to encounter better solutions (see Simulated Anneling), but, for now, will stick to simple descent.
+Moving in the direction of steepest decent, with certain consideration, will likely cause the cost to lower, and the network to perform better. The learning rate, $`\eta \in \mathbb{R}^{+}`$, is a parameter that tries to prevent the changes to overshoot a minima (either local or global). If $`\eta`$ is too large, the network might take too big of a step and miss a minima. This might be desirable to encounter better solutions (see Simulated Anneling), but, for now, will stick to simple descent.
 
-At every episode, the dataset $`X`$ will be put though a network $`\mathcal{N}_t`$ and the gradient of the cost function, alongside a learning rate $`\eta \in \mathbb{R}^{+}`$, will compute $`\mathcal{N}_{t+1}`$[^wiki]. That is:
+At every _episode_, the dataset $`X`$ will be put though a network $`\mathcal{N}_t`$ and the gradient of the cost function, alongside a learning rate $`\eta \in \mathbb{R}^{+}`$, will compute $`\mathcal{N}_{t+1}`$[^wiki;gradient-descent]. That is:
 
 ```math
-\mathcal{N}_{t+1} = \mathcal{N}_t - \eta\nabla{C(\mathcal{N}_t, X)}
+\mathcal{N}_{t+1} = \mathcal{N}_t - \eta \nabla C(\mathcal{N}_t, X)
 ```
 
 The starting network $`\mathcal{N}_0`$ will simply be initialized with random real numbers. Note that we abuse notation defining the episode serie, the gradient should also range over the dataset, but here we admit the dataset is not only contant, but its dimensions do not appear in the gradient.
@@ -151,9 +151,9 @@ using the chain rule, we get:
 
 The derivative of the cost in respect to the output, $`\frac{\partial C}{\partial a^2}`$, is $`\frac{1}{|X|} \sum_{\mathbf{x} \in X} \frac{\partial E}{\partial a^2}(\mathcal{N}, \mathbf{x})`$, which all evaluated to $`\frac{1}{|X|} \sum_{\mathbf{x} \in X} 2(y(u) - v)`$. $`\frac{\partial a^2}{\partial z^2}`$ is simply $`\sigma_2'(z^2(u))`$. And $`\frac{\partial z^2}{\partial a^1}`$ is $`w^2`$. The rest can be easily derived with the same logic.
 
-Now, only the inner parts, weights and biases, have their derivatives unknown. Most of what we have done already covers what they are, the last step is given: $`\frac{\partial z^2}{\partial w^2} = a^1`$, and $`\frac{\partial z^2}{\partial b^2} = 1`$.
+Only the inner parts, weights and biases, have their derivatives unknown. Most of what we have done already covers what they are, the last step is given: $`\frac{\partial z^2}{\partial w^2} = a^1`$, and $`\frac{\partial z^2}{\partial b^2} = 1`$.
 
-Now, to obtain, for example, $`\frac{\partial C}{\partial w^1}`$, we just attach the parts we know:
+To obtain, for example, $`\frac{\partial C}{\partial w^1}`$, we just attach the parts we know:
 
 ```math
 \frac{\partial C}{\partial a^2}
@@ -162,7 +162,7 @@ Now, to obtain, for example, $`\frac{\partial C}{\partial w^1}`$, we just attach
 \frac{\partial a^1}{\partial z^1}
 \frac{\partial z^1}{\partial w^1}
 \\ =
-\left(\frac{1}{|X|} \sum_{\mathbf{x} \in X} \frac{\partial E}{\partial a^2}(\mathcal{N}, \mathbf{x})\right) \cdot
+\left(\frac{2}{|X|} \sum_{\mathbf{x} \in X} (y(u) - v)\right) \cdot
 \sigma_2'(z^2(u)) \cdot
 w^2 \cdot
 \sigma_1'(z^1(u)) \cdot
@@ -171,20 +171,64 @@ u
 
 Most computations can be reused throughout the computation of the gradient, coming from the output back to the start, as if we are... backpropagating.
 
-### Backpropagation
+Now, to the last part of this section, we have to generalize what we derived to layers with multiple neurons. Just in case deriving a vector (tecnically a higher dimensional function) by another isn't clear (it is quite fuzzy, if you don't know it), we use a Jacobian matrix[^wiki;jacobian-matrix] for that. Just a refresher, let $`\mathbf{f}: \mathbb{R}^n \rightarrow \mathbb{R}^m`$, and $`\mathbf{x} = (x_i) \in \mathbb{R}^n`$, applying, we get $`\mathbf{f}(\mathbf{x}) = (f_i(\mathbf{x})) \in \mathbb{R}^m`$, the derivative $`\frac{d \mathbf{f}}{d \mathbf{x}} \in \mathcal{M}_{m \times n} (\mathbb{R}^n \rightarrow \mathbb{R})`$ is given:
 
-Computing the gradient through a numerical approximation will cause every sample to be run through the network for every time we nud a weight or bias, this is really inefficient. As it was hint in the last subsection, we'll get around this through a method called backpropagation.
+```math
+\frac{\partial \mathbf{f}}{\partial \mathbf{x}}
+= \begin{bmatrix} \frac{\partial \mathbf{f}}{\partial x_1} & \cdots & \frac{\partial \mathbf{f}}{\partial x_n} \end{bmatrix}
+= \begin{bmatrix} (\nabla f_1)^\top \\ \vdots \\ (\nabla f_n)^\top \end{bmatrix}
+= \begin{bmatrix}
+    \frac{\partial f_1}{\partial x_1} & \cdots & \frac{\partial f_1}{\partial x_n} \\
+    \vdots & \ddots & \vdots \\
+    \frac{\partial f_m}{\partial x_1} & \cdots & \frac{\partial f_m}{\partial x_n} \\
+\end{bmatrix}
+```
 
-...
+On a similar note, $`(\nabla f)^\top = \frac{\partial f}{\partial \mathbf{x}}`$.
 
-### References
+Now, we're trully ready, we are going to compute $`\frac{\partial C}{\partial \mathbf{u}}`$:
 
-[^lecun]: LeCUN, Yann; CORTES, Corinna; BURGES; Christopher J. C. THE MNIST DATABASE of handwritten digits. **Yann LeCun ExDB MNIST**. Available in: http://yann.lecun.com/exdb/mnist/ (through the [Wayback Machine](https://web.archive.org/web/20250114200757/http://yann.lecun.com/exdb/mnist/)). Access in May 11th, 2025.
+```math
+\frac{\partial C}{\partial \mathbf{u}} =
+\frac{\partial C}{\partial \mathbf{a}^{|\mathcal{N}|}} \cdot
+\frac{\partial \mathbf{a}^{|\mathcal{N}|}}{\partial \mathbf{z}^{|\mathcal{N}|}} \cdot
+\frac{\partial \mathbf{z}^{|\mathcal{N}|}}{\partial \mathbf{a}^{|\mathcal{N}-1|}} \cdot
+\frac{\partial \mathbf{a}^{|\mathcal{N}-1|}}{\partial \mathbf{z}^{|\mathcal{N}-1|}} \cdot
+\cdots \cdot
+\frac{\partial \mathbf{a}^{1}}{\partial \mathbf{z}^{1}} \cdot
+\frac{\partial \mathbf{z}^{1}}{\partial \mathbf{u}}
+```
 
-[^siramdasu]: SIRAMDASU, Vardhan. KAGGLE-DIGIT-RECOGNIZER. **Github Repository Kaggle-Digit-Recognizer**. Avaliable in: https://github.com/vardhan-siramdasu/Kaggle-Digit-Recognizer/blob/main/data/. Access in May 11th, 2025.
+It seems like it should have been a little more complicated, but it isn't. Some notes are:
+
+- operator $`\cdot`$ is, indeed, matrix multiplication;
+
+- $`\frac{\partial C}{\partial \mathbf{a}^{|\mathcal{N}|}}`$ is a row vector, with $`\frac{\partial C}{\partial a^{|\mathcal{N}|}_i} = \left(\frac{2}{|X|} \sum_{\mathbf{x} \in X} (a^{|\mathcal{N}|}_i(u) - v)\right)`$, $`\left(\frac{\partial C}{\partial \mathbf{a}^{|\mathcal{N}|}}\right)^\top = \nabla_\mathbf{y} C`$;
+
+- $`\frac{\partial \mathbf{a}^L}{\partial \mathbf{z}^L}`$ are diagonal matrices, having for all $`i \not= j`$, we have $`\frac{\partial a^L_i}{\partial z^L_j} = 0`$ and for all $`i`$, we have $`\frac{\partial a^L_i}{\partial z^L_i} = \sigma'_L(z^L_i)`$;
+
+- $`\frac{\partial \mathbf{z}^L}{\partial \mathbf{a}^{L-1}} = W^L`$, because $`(\mathbf{z}^L)' = (W^L \mathbf{x} + \mathbf{b}^L)' = (W^L \mathbf{x})' = W^L`$, since matrix multiplication is linear;
+
+- $`\frac{\partial \mathbf{z}^L}{\partial W^L}`$ is 3D matrix (using the second weight index as the third dimension), we have $`\frac{\partial z^L_i}{\partial w^L_{j,k}} = \begin{cases}a^{L-1}_k &\mid i = j \\ 0 &\mid i \not= j\end{cases}`$, which is also a diagonal matrix, if $`\mathbf{a}^{L-1}`$ was multiplied as a scalar, it would be just $`\mathbf{a}^{L-1} \cdot I_{n_L}`$.
+
+- $`\frac{\partial \mathbf{z}^L}{\partial \mathbf{b}^{L}} = I_{n_L}`$, an identity matrix, since they are diagonal matrices, and $`\frac{\partial z^L_i}{\partial b^L_j} = \begin{cases}1 &\mid i = j \\ 0 &\mid i \not= j\end{cases}`$.
+
+Finally, to what matters, the interest gradients:
+
+```math
+\nabla_{W^L} C = \frac{\partial C}{\partial \mathbf{a}^{|\mathcal{N}|}} \cdot \prod_{l = |\mathcal{N}|}^{L}{\frac{\partial \mathbf{a}^L}{\partial \mathbf{z}^l} \cdot \frac{\partial \mathbf{z}^l}{\partial \mathbf{a}^{l-1}}}
+```
+
+## References
+
+[^lecun;et-al]: LeCUN, Yann; CORTES, Corinna; BURGES; Christopher J. C. THE MNIST DATABASE of handwritten digits. **Yann LeCun ExDB MNIST**. Available in: http://yann.lecun.com/exdb/mnist/ (through the [Wayback Machine](https://web.archive.org/web/20250114200757/http://yann.lecun.com/exdb/mnist/)). Access in December 19th, 2025.
 
 [^sanderson]: SANDERSON, Grant. NEURAL NETWORKS. **Youtube Channel 3Blue1Brown**. Available in: https://www.youtube.com/watch?v=aircAruvnKk&list=PLZHQObOWTQDNU6R1_67000Dx_ZCJB-3pi. Access in May 11th, 2025.
 
 [^mcculloch;pitts]: McCULLOCH, Warren S.; PITTS, Walter. A LOGICAL CALCULUS OF THE IDEAS IMMANENT IN NERVOUS ACTIVITY*. **Bulletin of Mathematical Biology**. Vol. 52, No. 1/2, pp. 99-115, 1990. Available in: https://www.cs.cmu.edu/~epxing/Class/10715/reading/McCulloch.and.Pitts.pdf. Access in May 11th, 2025.
 
-[^wiki] WIKIPEDIA. Gradient descent. **Wikipedia - The Free Encyclopedia**. Avaliable in: https://en.wikipedia.org/wiki/Gradient_descent. Access in December 19th, 2025.
+[^wiki;gradient-descent]: WIKIPEDIA. Gradient descent. **Wikipedia - The Free Encyclopedia**. Avaliable in: https://en.wikipedia.org/wiki/Gradient_descent. Access in December 19th, 2025.
+
+[^wiki;jacobian-matrix]:  WIKIPEDIA. Jacobian matrix and determinant. **Wikipedia - The Free Encyclopedia**. Avaliable in: https://en.wikipedia.org/wiki/Jacobian_matrix_and_determinant. Access in December 28th, 2025.
+
+[^wiki;softmax]: WIKIPEDIA. Softmax function. **Wikipedia - The Free Encyclopedia**. Avaliable in: https://en.wikipedia.org/wiki/Softmax_function. Access in December 27th, 2025.
