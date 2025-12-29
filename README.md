@@ -149,7 +149,7 @@ using the chain rule, we get:
 \frac{\partial z^1}{\partial u}
 ```
 
-The derivative of the cost in respect to the output, $`\frac{\partial C}{\partial a^2}`$, is $`\frac{1}{|X|} \sum_{\mathbf{x} \in X} \frac{\partial E}{\partial a^2}(\mathcal{N}, \mathbf{x})`$, which all evaluated to $`\frac{1}{|X|} \sum_{\mathbf{x} \in X} 2(y(u) - v)`$. $`\frac{\partial a^2}{\partial z^2}`$ is simply $`\sigma_2'(z^2(u))`$. And $`\frac{\partial z^2}{\partial a^1}`$ is $`w^2`$. The rest can be easily derived with the same logic.
+The derivative of the cost in respect to the output, $`\frac{\partial C}{\partial a^2}`$, is $`\frac{1}{|X|} \sum_{\mathbf{x} \in X} \frac{\partial E}{\partial a^2}(\mathcal{N}, \mathbf{x})`$, which all evaluated to $`\frac{1}{|X|} \sum_{(u, v) \in X} 2(y(u) - v)`$. $`\frac{\partial a^2}{\partial z^2}`$ is simply $`\sigma_2'(z^2(u))`$. And $`\frac{\partial z^2}{\partial a^1}`$ is $`w^2`$. The rest can be easily derived with the same logic.
 
 Only the inner parts, weights and biases, have their derivatives unknown. Most of what we have done already covers what they are, the last step is given: $`\frac{\partial z^2}{\partial w^2} = a^1`$, and $`\frac{\partial z^2}{\partial b^2} = 1`$.
 
@@ -162,7 +162,7 @@ To obtain, for example, $`\frac{\partial C}{\partial w^1}`$, we just attach the 
 \frac{\partial a^1}{\partial z^1}
 \frac{\partial z^1}{\partial w^1}
 \\ =
-\left(\frac{2}{|X|} \sum_{\mathbf{x} \in X} (y(u) - v)\right) \cdot
+\frac{2}{|X|} \sum_{(u, v) \in X} (y(u) - v) \cdot
 \sigma_2'(z^2(u)) \cdot
 w^2 \cdot
 \sigma_1'(z^1(u)) \cdot
@@ -184,7 +184,7 @@ Now, to the last part of this section, we have to generalize what we derived to 
 \end{bmatrix}
 ```
 
-On a similar note, $`(\nabla f)^\top = \frac{\partial f}{\partial \mathbf{x}}`$.
+On a similar note, $`(\nabla_\mathbf{x} f)^\top = \frac{\partial f}{\partial \mathbf{x}}`$.
 
 Now, we're trully ready, we are going to compute $`\frac{\partial C}{\partial \mathbf{u}}`$:
 
@@ -209,15 +209,37 @@ It seems like it should have been a little more complicated, but it isn't. Some 
 
 - $`\frac{\partial \mathbf{z}^L}{\partial \mathbf{a}^{L-1}} = W^L`$, because $`(\mathbf{z}^L)' = (W^L \mathbf{x} + \mathbf{b}^L)' = (W^L \mathbf{x})' = W^L`$, since matrix multiplication is linear;
 
-- $`\frac{\partial \mathbf{z}^L}{\partial W^L}`$ is 3D matrix (using the second weight index as the third dimension), we have $`\frac{\partial z^L_i}{\partial w^L_{j,k}} = \begin{cases}a^{L-1}_k &\mid i = j \\ 0 &\mid i \not= j\end{cases}`$, which is also a diagonal matrix, if $`\mathbf{a}^{L-1}`$ was multiplied as a scalar, it would be just $`\mathbf{a}^{L-1} \cdot I_{n_L}`$.
+- $`\frac{\partial \mathbf{z}^L}{\partial W^L}`$ is 3D matrix (using the second weight index as the third dimension), we have $`\frac{\partial z^L_i}{\partial w^L_{j,k}} = \begin{cases}a^{L-1}_k &\mid i = j \\ 0 &\mid i \not= j\end{cases}`$, which is also a diagonal matrix, if $`s \circ A_{i,j} = (sA)_{i,j}`$ was scalar-like multiplication, but for everything, it would be just $`(\mathbf{a}^{L-1})^\top \circ I_{n_L}`$; and
 
 - $`\frac{\partial \mathbf{z}^L}{\partial \mathbf{b}^{L}} = I_{n_L}`$, an identity matrix, since they are diagonal matrices, and $`\frac{\partial z^L_i}{\partial b^L_j} = \begin{cases}1 &\mid i = j \\ 0 &\mid i \not= j\end{cases}`$.
 
-Finally, to what matters, the interest gradients:
+For better representation, $`\frac{\partial \mathbf{a}^L}{\partial \mathbf{z}^L}`$ important results, the diagonal, will be made into a column vector, to better match its internal representation, this way, we swap the matrix multiplication by Hadamard product, $`\odot`$, also know as entry-wise matrix multiplication, which makes it equivalent in this case. We also drop the identity matrices for a similar reason, but the operations will still be the same.
+
+### Backpropagation
+
+Computing the gradient through a numerical approximation will cause every sample to be run through the network for every time we nudge a weight or bias, this is really inefficient. As it was hinted in the last subsection, we'll get around this through an algorithm called backpropagation.
+
+Backpropagation consists of, first, a forward pass, i.e., running a sample through the network, we must also remember the middle step, $`\mathbf{z}`$, and know the derivative of the activation functions before-hand as well.
+
+The error accumulating at each layer, $`\delta^L \in \mathcal{M}_{n_L \times 1} (\mathbb{R})`$, it's defined recursively as follows:
 
 ```math
-\nabla_{W^L} C = \frac{\partial C}{\partial \mathbf{a}^{|\mathcal{N}|}} \cdot \prod_{l = |\mathcal{N}|}^{L}{\frac{\partial \mathbf{a}^L}{\partial \mathbf{z}^l} \cdot \frac{\partial \mathbf{z}^l}{\partial \mathbf{a}^{l-1}}}
+\begin{align*}
+    \delta^{|\mathcal{N}|} &= \nabla_\mathbf{y} C \odot \sigma'_{|\mathcal{N}|}(\mathbf{z}^{|\mathcal{N}|}) \\
+    \delta^{L-1} &= ((W^L)^\top \cdot \delta^L) \odot \sigma'_{|\mathcal{N}|}(\mathbf{z}^{|\mathcal{N}|})
+\end{align*}
 ```
+
+At last, the final gradients:
+
+```math
+\begin{align*}
+    \nabla_{W^L} C &= \delta^L \cdot (\mathbf{a}^{L-1})^\top \\
+    \nabla_{\mathbf{b}^L} C &= \delta^L \\
+\end{align*}
+```
+
+<!-- TODO: explain transpositions -->
 
 ## References
 
