@@ -1,6 +1,10 @@
 package nn
 
-import "github.com/alan-b-lima/nn-digits/pkg/nnmath"
+import (
+	"cmp"
+
+	"github.com/alan-b-lima/nn-digits/pkg/nnmath"
+)
 
 func (nn *NeuralNetwork) Cost(dataset []LabeledSample) float64 {
 	var cost float64
@@ -30,19 +34,8 @@ func (nn *NeuralNetwork) Status(dataset []LabeledSample) (int, float64) {
 			cost += diff * diff
 		}
 
-		index := reduce(output, func(index int, v float64, i int) int {
-			if v > output[index] {
-				return i
-			}
-			return index
-		})
-
-		label := reduce(expected, func(label int, v float64, i int) int {
-			if v > output[label] {
-				return i
-			}
-			return label
-		})
+		index := index_of_max(output)
+		label := index_of_max(expected)
 
 		if index == label {
 			correct++
@@ -58,15 +51,21 @@ func (nn *NeuralNetwork) SampleCostDerivative(cost nnmath.Vector, sample Labeled
 
 	vector := cost.Data()
 	for i := range len(output) {
-		vector[i] += output[i] - expected[i]
+		vector[i] = output[i] - expected[i]
 	}
 }
 
-func reduce[E, R any](s []E, fn func(acc R, v E, i int) R) R {
-	var acc R
-	for i, v := range s {
-		acc = fn(acc, v, i)
+func index_of_max[T ~[]E, E cmp.Ordered](s T) int {
+	if len(s) == 0 {
+		return -1
 	}
 
-	return acc
+	var index int
+	for i, v := range s[1:] {
+		if v > s[index] {
+			index = i
+		}
+	}
+
+	return index
 }
