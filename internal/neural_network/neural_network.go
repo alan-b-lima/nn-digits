@@ -88,7 +88,7 @@ func (nn *NeuralNetwork) Dims() []int {
 }
 
 // FeedForward computes the output of the neural network given an input vector.
-// 
+//
 // FeedForward panics if the input is not a matrix [n x 1] (a vector of length
 // n), where n = [NeuralNetwork.InLen]().
 func (nn *NeuralNetwork) FeedForward(input nnmath.Vector) nnmath.Vector {

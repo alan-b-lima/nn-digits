@@ -7,14 +7,14 @@ import (
 )
 
 func (nn *NeuralNetwork) Cost(dataset []LabeledSample) (int, float64) {
-	nn.mu.RLock()
-	defer nn.mu.RUnlock()
-
 	var cost float64
 	var correct int
 
+	comp := nn.get_comp()
+	defer nn.free_comp(comp)
+
 	for _, sample := range dataset {
-		output := nn.FeedForward(sample.Values).Data()
+		output := nn.feed_forward(comp, sample.Values).Data()
 		expected := sample.Label.Data()
 
 		for i := range len(output) {

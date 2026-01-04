@@ -17,11 +17,8 @@ func (nn *NeuralNetwork) apply_gradient(learn *[]learning, rate float64) {
 	for i, layer := range nn.layers {
 		learn := (*learn)[i]
 
-		nnmath.SMulP(learn.WeightGradient, -rate, learn.WeightGradient)
-		nnmath.SMulP(learn.BiasGradient, -rate, learn.BiasGradient)
-
-		nnmath.AddP(layer.Weights, layer.Weights, learn.WeightGradient)
-		nnmath.AddP(layer.Biases, layer.Biases, learn.BiasGradient)
+		nnmath.AddSMulP(layer.Weights, layer.Weights, -rate, learn.WeightGradient)
+		nnmath.AddSMulP(layer.Biases, layer.Biases, -rate, learn.BiasGradient)
 	}
 }
 
@@ -54,6 +51,7 @@ func (nn *NeuralNetwork) compute_gradient(learn *[]learning, dataset []LabeledSa
 			nnmath.AddP(curr.BiasGradient, curr.BiasGradient, curr.ErrorPropagation)
 		}
 
+		nn.mu.RLock()
 		for i := len(nn.layers) - 2; i >= 0; i-- {
 			input := sample.Values
 			if i > 0 {
@@ -74,6 +72,7 @@ func (nn *NeuralNetwork) compute_gradient(learn *[]learning, dataset []LabeledSa
 			nnmath.AddMulP(curr.WeightGradient, curr.WeightGradient, curr.ErrorPropagation, a)
 			nnmath.AddP(curr.BiasGradient, curr.BiasGradient, curr.ErrorPropagation)
 		}
+		nn.mu.RUnlock()
 
 		factor := 1 / float64(len(dataset))
 		for _, layer := range *learn {
