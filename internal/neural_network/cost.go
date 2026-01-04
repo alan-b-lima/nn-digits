@@ -6,22 +6,10 @@ import (
 	"github.com/alan-b-lima/nn-digits/pkg/nnmath"
 )
 
-func (nn *NeuralNetwork) Cost(dataset []LabeledSample) float64 {
-	var cost float64
-	for _, sample := range dataset {
-		output := nn.FeedForward(sample.Values).Data()
-		expected := sample.Label.Data()
+func (nn *NeuralNetwork) Cost(dataset []LabeledSample) (int, float64) {
+	nn.mu.RLock()
+	defer nn.mu.RUnlock()
 
-		for i := range len(output) {
-			diff := output[i] - expected[i]
-			cost += diff * diff
-		}
-	}
-
-	return .5 * cost / float64(len(dataset))
-}
-
-func (nn *NeuralNetwork) Status(dataset []LabeledSample) (int, float64) {
 	var cost float64
 	var correct int
 
@@ -45,8 +33,8 @@ func (nn *NeuralNetwork) Status(dataset []LabeledSample) (int, float64) {
 	return correct, .5 * cost / float64(len(dataset))
 }
 
-func (nn *NeuralNetwork) SampleCostDerivative(cost nnmath.Vector, sample LabeledSample) {
-	output := nn.FeedForward(sample.Values).Data()
+func (nn *NeuralNetwork) sample_cost_derivative(learn *[]computation, cost nnmath.Vector, sample LabeledSample) {
+	output := nn.feed_forward(learn, sample.Values).Data()
 	expected := sample.Label.Data()
 
 	vector := cost.Data()

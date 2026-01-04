@@ -6,19 +6,17 @@ import (
 	"github.com/alan-b-lima/nn-digits/pkg/mem"
 )
 
-func (nn NeuralNetwork) MarshalJSON() ([]byte, error) {
-	if len(nn.Layers) == 0 {
+func (nn *NeuralNetwork) MarshalJSON() ([]byte, error) {
+	if len(nn.layers) == 0 {
 		return []byte("{}"), nil
 	}
 
-	jn := neural_network{
-		Dimensions: make([]int, 0, len(nn.Layers)+1),
-		Layers:     nn.buf,
-	}
+	nn.mu.RLock()
+	defer nn.mu.RUnlock()
 
-	jn.Dimensions = append(jn.Dimensions, nn.Layers[0].Weights.Cols())
-	for _, layer := range nn.Layers {
-		jn.Dimensions = append(jn.Dimensions, layer.Weights.Rows())
+	jn := neural_network{
+		Dimensions: nn.Dims(),
+		Layers:     nn.buf,
 	}
 
 	return json.Marshal(jn)
@@ -30,8 +28,14 @@ func (nn *NeuralNetwork) UnmarshalJSON(buf []byte) error {
 		return err
 	}
 
+	nn.mu.Lock()
+	defer nn.mu.Unlock()
+
 	*nn = NeuralNetwork{buf: jn.Layers}
-	nn.Layers = slice_nn(nn.buf, jn.Dimensions...)
+
+	nn.layers = slice_nn(nn.buf, jn.Dimensions...)
+	nn.comp = mem.NewPool(nn.new_comp)
+	nn.learn = mem.NewPool(nn.new_learn)
 
 	return nil
 }

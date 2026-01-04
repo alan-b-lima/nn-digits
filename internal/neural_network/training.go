@@ -1,83 +1,50 @@
 package nn
 
-import (
-	"github.com/alan-b-lima/nn-digits/pkg/nnmath"
-)
-
-const use_backpropagation = true
+import "github.com/alan-b-lima/nn-digits/pkg/nnmath"
 
 func (nn *NeuralNetwork) Learn(dataset []LabeledSample, rate float64) {
-	nn.compute_gradient(dataset)
-	nn.apply_gradient(rate)
+	learn := nn.get_learn()
+	defer nn.free_learn(learn)
+
+	nn.compute_gradient(learn, dataset)
+	nn.apply_gradient(learn, rate)
 }
 
-func (nn *NeuralNetwork) apply_gradient(rate float64) {
-	for _, layer := range nn.Layers {
-		nnmath.SMulP(layer.WeightGradient, -rate, layer.WeightGradient)
-		nnmath.SMulP(layer.BiasGradient, -rate, layer.BiasGradient)
+func (nn *NeuralNetwork) apply_gradient(learn *[]learning, rate float64) {
+	nn.mu.Lock()
+	defer nn.mu.Unlock()
 
-		nnmath.AddP(layer.Weights, layer.Weights, layer.WeightGradient)
-		nnmath.AddP(layer.Biases, layer.Biases, layer.BiasGradient)
+	for i, layer := range nn.layers {
+		learn := (*learn)[i]
+
+		nnmath.SMulP(learn.WeightGradient, -rate, learn.WeightGradient)
+		nnmath.SMulP(learn.BiasGradient, -rate, learn.BiasGradient)
+
+		nnmath.AddP(layer.Weights, layer.Weights, learn.WeightGradient)
+		nnmath.AddP(layer.Biases, layer.Biases, learn.BiasGradient)
 	}
 }
 
-func (nn *NeuralNetwork) compute_gradient(dataset []LabeledSample) {
-	if use_backpropagation {
-		nn.backpropagate(dataset)
-	} else {
-		nn.naive_brute_force(dataset)
-	}
-}
-
-func (nn *NeuralNetwork) naive_brute_force(dataset []LabeledSample) {
-	const h = 1e-3
-	cost := nn.Cost(dataset)
-
-	for _, layer := range nn.Layers {
-		weights := layer.Weights
-		biases := layer.Biases
-
-		gweight := layer.WeightGradient
-		gbias := layer.BiasGradient
-
-		for r := range weights.Rows() {
-			for c := range weights.Cols() {
-				weights.Set(r, c, weights.At(r, c)+h)
-				diff := nn.Cost(dataset) - cost
-				weights.Set(r, c, weights.At(r, c)-h)
-
-				gweight.Set(r, c, diff/h)
-			}
-
-			biases.Set(r, 0, biases.At(r, 0)+h)
-			diff := nn.Cost(dataset) - cost
-			biases.Set(r, 0, biases.At(r, 0)-h)
-
-			gbias.Set(r, 0, diff/h)
-		}
-	}
-}
-
-func (nn *NeuralNetwork) backpropagate(dataset []LabeledSample) {
-	if len(nn.Layers) == 0 {
+func (nn *NeuralNetwork) compute_gradient(learn *[]learning, dataset []LabeledSample) {
+	if len(nn.layers) == 0 {
 		return
 	}
 
-	for _, layer := range nn.Layers {
-		nnmath.Zero(layer.WeightGradient)
-		nnmath.Zero(layer.BiasGradient)
+	comp := make([]computation, len(nn.layers))
+	for i, buf := range *learn {
+		comp[i] = computation{buf.Activation}
 	}
 
 	for _, sample := range dataset {
 		{
 			input := sample.Values
-			if len(nn.Layers) > 1 {
-				input = nn.Layers[len(nn.Layers)-2].Activation
+			if len(nn.layers) > 1 {
+				input = (*learn)[len(nn.layers)-1].Activation
 			}
 
-			curr := nn.Layers[len(nn.Layers)-1]
+			curr := (*learn)[len(nn.layers)-1]
 
-			nn.SampleCostDerivative(curr.ErrorPropagation, sample)
+			nn.sample_cost_derivative(&comp, curr.ErrorPropagation, sample)
 
 			nnmath.SoftmaxDerivativeFromActivation(curr.Activation.Data())
 			nnmath.HMulP(curr.ErrorPropagation, curr.ErrorPropagation, curr.Activation)
@@ -87,18 +54,18 @@ func (nn *NeuralNetwork) backpropagate(dataset []LabeledSample) {
 			nnmath.AddP(curr.BiasGradient, curr.BiasGradient, curr.ErrorPropagation)
 		}
 
-		for i := len(nn.Layers) - 2; i >= 0; i-- {
+		for i := len(nn.layers) - 2; i >= 0; i-- {
 			input := sample.Values
 			if i > 0 {
-				input = nn.Layers[i-1].Activation
+				input = (*learn)[len(nn.layers)-1].Activation
 			}
 
-			next := nn.Layers[i+1]
-			curr := nn.Layers[i]
+			next := (*learn)[i+1]
+			curr := (*learn)[i]
 
 			t := nnmath.MakeMatData(1, next.ErrorPropagation.Rows(), next.ErrorPropagation.Data())
 			r := nnmath.MakeMatData(1, curr.ErrorPropagation.Rows(), curr.ErrorPropagation.Data())
-			nnmath.MulP(r, t, next.Weights)
+			nnmath.MulP(r, t, nn.layers[i+1].Weights)
 
 			nnmath.ApplyP(curr.Activation, curr.Activation, SigmoidDerivativeFromActivation)
 			nnmath.HMulP(curr.ErrorPropagation, curr.ErrorPropagation, curr.Activation)
@@ -109,7 +76,7 @@ func (nn *NeuralNetwork) backpropagate(dataset []LabeledSample) {
 		}
 
 		factor := 1 / float64(len(dataset))
-		for _, layer := range nn.Layers {
+		for _, layer := range *learn {
 			nnmath.SMulP(layer.WeightGradient, factor, layer.WeightGradient)
 			nnmath.SMulP(layer.BiasGradient, factor, layer.BiasGradient)
 		}
