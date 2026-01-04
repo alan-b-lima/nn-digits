@@ -2,6 +2,8 @@ package nnmath
 
 import "fmt"
 
+const safe = true
+
 type Matrix struct {
 	rows int
 	cols int
@@ -19,8 +21,10 @@ func MakeMat(rows, cols int) Matrix {
 }
 
 func MakeMatData(rows, cols int, data []float64) Matrix {
-	if len(data) != rows*cols {
-		panic(fmt.Sprintf("data length %d does not match matrix size %d,%d", len(data), rows, cols))
+	if safe {
+		if len(data) != rows*cols {
+			panic(fmt.Sprintf("data length %d does not match matrix size %d,%d", len(data), rows, cols))
+		}
 	}
 
 	return Matrix{
@@ -35,8 +39,10 @@ func MakeVec(size int) Vector {
 }
 
 func MakeVecData(size int, data []float64) Vector {
-	if len(data) != size {
-		panic(fmt.Sprintf("data length %d does not match vector size %d", len(data), size))
+	if safe {
+		if len(data) != size {
+			panic(fmt.Sprintf("data length %d does not match vector size %d", len(data), size))
+		}
 	}
 
 	return MakeMatData(size, 1, data)
@@ -63,16 +69,20 @@ func (M Matrix) Data() []float64 {
 }
 
 func (M Matrix) At(row, col int) float64 {
-	if row < 0 || M.rows <= row || col < 0 || M.cols <= col {
-		panic(fmt.Sprintf("index out of range [%d][%d] with length %d,%d", row, col, M.rows, M.cols))
+	if safe {
+		if row < 0 || M.rows <= row || col < 0 || M.cols <= col {
+			panic(fmt.Sprintf("index out of range [%d][%d] with length %d,%d", row, col, M.rows, M.cols))
+		}
 	}
 
 	return M.data[row*M.cols+col]
 }
 
 func (M Matrix) Set(row, col int, value float64) {
-	if row < 0 || M.rows <= row || col < 0 || M.cols <= col {
-		panic(fmt.Sprintf("index out of range [%d][%d] with length %d,%d", row, col, M.rows, M.cols))
+	if safe {
+		if row < 0 || M.rows <= row || col < 0 || M.cols <= col {
+			panic(fmt.Sprintf("index out of range [%d][%d] with length %d,%d", row, col, M.rows, M.cols))
+		}
 	}
 
 	M.data[row*M.cols+col] = value
@@ -115,16 +125,20 @@ func Zero(A Matrix) {
 }
 
 func Assign(A Matrix, B Matrix) {
-	if A.rows != B.rows || A.cols != B.cols {
-		panic("matrix dimensions do not match")
+	if safe {
+		if A.rows != B.rows || A.cols != B.cols {
+			panic("matrix dimensions do not match")
+		}
 	}
 
 	copy(A.data, B.data)
 }
 
 func AddP(R Matrix, A, B Matrix) {
-	if A.rows != B.rows || A.cols != B.cols || R.rows != A.rows || R.cols != A.cols {
-		panic("matrix dimensions do not match")
+	if safe {
+		if A.rows != B.rows || A.cols != B.cols || R.rows != A.rows || R.cols != A.cols {
+			panic("matrix dimensions do not match")
+		}
 	}
 
 	for i := range len(A.data) {
@@ -133,8 +147,10 @@ func AddP(R Matrix, A, B Matrix) {
 }
 
 func AddMulP(R Matrix, A, B, C Matrix) {
-	if B.cols != C.rows || A.rows != B.rows || A.cols != C.cols || R.rows != A.rows || R.cols != A.cols {
-		panic("matrix dimensions do not match")
+	if safe {
+		if B.cols != C.rows || A.rows != B.rows || A.cols != C.cols || R.rows != A.rows || R.cols != A.cols {
+			panic("matrix dimensions do not match")
+		}
 	}
 
 	for i := range B.rows {
@@ -149,8 +165,10 @@ func AddMulP(R Matrix, A, B, C Matrix) {
 }
 
 func MulP(R Matrix, A, B Matrix) {
-	if A.cols != B.rows || R.rows != A.rows || R.cols != B.cols {
-		panic("matrix dimensions do not match")
+	if safe {
+		if A.cols != B.rows || R.rows != A.rows || R.cols != B.cols {
+			panic("matrix dimensions do not match")
+		}
 	}
 
 	for i := range A.rows {
@@ -165,8 +183,10 @@ func MulP(R Matrix, A, B Matrix) {
 }
 
 func HMulP(R Matrix, A, B Matrix) {
-	if A.rows != B.rows || A.cols != B.cols || R.rows != A.rows || R.cols != A.cols {
-		panic("matrix dimensions do not match")
+	if safe {
+		if A.rows != B.rows || A.cols != B.cols || R.rows != A.rows || R.cols != A.cols {
+			panic("matrix dimensions do not match")
+		}
 	}
 
 	for i := range len(A.data) {
@@ -175,8 +195,10 @@ func HMulP(R Matrix, A, B Matrix) {
 }
 
 func SMulP(R Matrix, s float64, A Matrix) {
-	if R.rows != A.rows || R.cols != A.cols {
-		panic("matrix dimensions do not match")
+	if safe {
+		if R.rows != A.rows || R.cols != A.cols {
+			panic("matrix dimensions do not match")
+		}
 	}
 
 	for i := range len(A.data) {
@@ -185,8 +207,10 @@ func SMulP(R Matrix, s float64, A Matrix) {
 }
 
 func ApplyP(R Matrix, A Matrix, fn func(float64) float64) {
-	if R.rows != A.rows || R.cols != A.cols {
-		panic("matrix dimensions do not match")
+	if safe {
+		if R.rows != A.rows || R.cols != A.cols {
+			panic("matrix dimensions do not match")
+		}
 	}
 
 	for i := range len(A.data) {
