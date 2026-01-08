@@ -2,11 +2,15 @@ package nn
 
 import "github.com/alan-b-lima/nn-digits/pkg/nnmath"
 
-func (nn *NeuralNetwork) Learn(dataset []LabeledSample, rate float64) {
-	learn := nn.get_learn()
-	defer nn.free_learn(learn)
+type NeuralNetworkInTraining struct {
+	NeuralNetwork
+}
 
-	nn.compute_gradient(learn, dataset)
+func (nn *NeuralNetwork) Learn(dataset []LabeledSample, rate float64) {
+	comp, learn := nn.get_learn()
+	defer nn.free_learn(comp, learn)
+
+	nn.compute_gradient(comp, learn, dataset)
 	nn.apply_gradient(learn, rate)
 }
 
@@ -22,29 +26,25 @@ func (nn *NeuralNetwork) apply_gradient(learn *[]learning, rate float64) {
 	}
 }
 
-func (nn *NeuralNetwork) compute_gradient(learn *[]learning, dataset []LabeledSample) {
+func (nn *NeuralNetwork) compute_gradient(comp *[]computation, learn *[]learning, dataset []LabeledSample) {
 	if len(nn.layers) == 0 {
 		return
-	}
-
-	comp := make([]computation, len(nn.layers))
-	for i, buf := range *learn {
-		comp[i] = computation{buf.Activation}
 	}
 
 	for _, sample := range dataset {
 		{
 			input := sample.Values
 			if len(nn.layers) > 1 {
-				input = (*learn)[len(nn.layers)-2].Activation
+				input = (*comp)[len(nn.layers)-2].Activation
 			}
 
+			activation := (*comp)[len(nn.layers)-1].Activation
 			curr := (*learn)[len(nn.layers)-1]
 
-			nn.sample_cost_derivative(&comp, curr.ErrorPropagation, sample)
+			nn.sample_cost_derivative(comp, curr.ErrorPropagation, sample)
 
-			nnmath.SoftmaxDerivativeFromActivation(curr.Activation.Data())
-			nnmath.HMul(curr.ErrorPropagation, curr.ErrorPropagation, curr.Activation)
+			nnmath.SoftmaxDerivativeFromActivation(activation.Data())
+			nnmath.HMul(curr.ErrorPropagation, curr.ErrorPropagation, activation)
 
 			a := nnmath.MakeMatData(1, input.Rows(), input.Data())
 			nnmath.AddMul(curr.WeightGradient, curr.WeightGradient, curr.ErrorPropagation, a)
@@ -55,9 +55,10 @@ func (nn *NeuralNetwork) compute_gradient(learn *[]learning, dataset []LabeledSa
 		for i := len(nn.layers) - 2; i >= 0; i-- {
 			input := sample.Values
 			if i > 0 {
-				input = (*learn)[i-1].Activation
+				input = (*comp)[i-1].Activation
 			}
 
+			activation := (*comp)[i].Activation
 			next := (*learn)[i+1]
 			curr := (*learn)[i]
 
@@ -65,8 +66,8 @@ func (nn *NeuralNetwork) compute_gradient(learn *[]learning, dataset []LabeledSa
 			r := nnmath.MakeMatData(1, curr.ErrorPropagation.Rows(), curr.ErrorPropagation.Data())
 			nnmath.Mul(r, t, nn.layers[i+1].Weights)
 
-			nnmath.Apply(curr.Activation, curr.Activation, SigmoidDerivativeFromActivation)
-			nnmath.HMul(curr.ErrorPropagation, curr.ErrorPropagation, curr.Activation)
+			nnmath.Apply(activation, activation, SigmoidDerivativeFromActivation)
+			nnmath.HMul(curr.ErrorPropagation, curr.ErrorPropagation, activation)
 
 			a := nnmath.MakeMatData(1, input.Rows(), input.Data())
 			nnmath.AddMul(curr.WeightGradient, curr.WeightGradient, curr.ErrorPropagation, a)

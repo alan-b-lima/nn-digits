@@ -130,7 +130,6 @@ type computation struct {
 }
 
 type learning struct {
-	Activation       nnmath.Vector
 	WeightGradient   nnmath.Matrix
 	BiasGradient     nnmath.Vector
 	ErrorPropagation nnmath.Vector
@@ -172,7 +171,7 @@ func (nn *NeuralNetwork) new_learn() *[]learning {
 	var size int
 	for _, layer := range nn.layers {
 		next, curr := layer.Weights.Dim()
-		size += next + next*curr + next + next
+		size += next*curr + next + next
 	}
 
 	buf := make([]float64, size)
@@ -181,7 +180,6 @@ func (nn *NeuralNetwork) new_learn() *[]learning {
 	for i, layer := range nn.layers {
 		next, curr := layer.Weights.Dim()
 
-		learn[i].Activation = nnmath.MakeVecData(next, mem.Take(&buf, next))
 		learn[i].WeightGradient = nnmath.MakeMatData(next, curr, mem.Take(&buf, next*curr))
 		learn[i].BiasGradient = nnmath.MakeVecData(next, mem.Take(&buf, next))
 		learn[i].ErrorPropagation = nnmath.MakeVecData(next, mem.Take(&buf, next))
@@ -190,19 +188,21 @@ func (nn *NeuralNetwork) new_learn() *[]learning {
 	return &learn
 }
 
-func (nn *NeuralNetwork) get_learn() *[]learning {
-	v := nn.learn.Get()
+func (nn *NeuralNetwork) get_learn() (*[]computation, *[]learning) {
+	c := nn.comp.Get()
+	l := nn.learn.Get()
 
-	for _, v := range *v {
+	for _, v := range *l {
 		nnmath.Zero(v.WeightGradient)
 		nnmath.Zero(v.BiasGradient)
 	}
 
-	return v
+	return c, l
 }
 
-func (nn *NeuralNetwork) free_learn(v *[]learning) {
-	nn.learn.Put(v)
+func (nn *NeuralNetwork) free_learn(c *[]computation, l *[]learning) {
+	nn.comp.Put(c)
+	nn.learn.Put(l)
 }
 
 func size_nn(dims ...int) int {
