@@ -1,7 +1,6 @@
 package nn
 
 import (
-	"math"
 	"math/rand/v2"
 	"sync"
 
@@ -194,24 +193,16 @@ func (nn *NeuralNetwork) new_learn() *[]learning {
 func (nn *NeuralNetwork) get_learn() *[]learning {
 	v := nn.learn.Get()
 
+	for _, v := range *v {
+		nnmath.Zero(v.WeightGradient)
+		nnmath.Zero(v.BiasGradient)
+	}
+
 	return v
 }
 
 func (nn *NeuralNetwork) free_learn(v *[]learning) {
 	nn.learn.Put(v)
-}
-
-func Sigmoid(x float64) float64 {
-	return 1 / (1 + math.Exp(-x))
-}
-
-func SigmoidDerivative(x float64) float64 {
-	sig := Sigmoid(x)
-	return sig * (1 - sig)
-}
-
-func SigmoidDerivativeFromActivation(x float64) float64 {
-	return x * (1 - x)
 }
 
 func size_nn(dims ...int) int {

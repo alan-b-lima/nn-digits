@@ -22,10 +22,10 @@ func (nn *NeuralNetwork) Cost(dataset []LabeledSample) (int, float64) {
 			cost += diff * diff
 		}
 
-		index := index_of_max(output)
+		class := index_of_max(output)
 		label := index_of_max(expected)
 
-		if index == label {
+		if class == label {
 			correct++
 		}
 	}
@@ -49,7 +49,7 @@ func index_of_max[T ~[]E, E cmp.Ordered](s T) int {
 	}
 
 	var index int
-	for i, v := range s[1:] {
+	for i, v := range s {
 		if v > s[index] {
 			index = i
 		}

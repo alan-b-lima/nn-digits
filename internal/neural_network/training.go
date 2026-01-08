@@ -36,7 +36,7 @@ func (nn *NeuralNetwork) compute_gradient(learn *[]learning, dataset []LabeledSa
 		{
 			input := sample.Values
 			if len(nn.layers) > 1 {
-				input = (*learn)[len(nn.layers)-1].Activation
+				input = (*learn)[len(nn.layers)-2].Activation
 			}
 
 			curr := (*learn)[len(nn.layers)-1]
@@ -55,7 +55,7 @@ func (nn *NeuralNetwork) compute_gradient(learn *[]learning, dataset []LabeledSa
 		for i := len(nn.layers) - 2; i >= 0; i-- {
 			input := sample.Values
 			if i > 0 {
-				input = (*learn)[len(nn.layers)-1].Activation
+				input = (*learn)[i-1].Activation
 			}
 
 			next := (*learn)[i+1]
