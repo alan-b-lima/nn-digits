@@ -88,36 +88,6 @@ func (M Matrix) Set(row, col int, value float64) {
 	M.data[row*M.cols+col] = value
 }
 
-func Add(A, B Matrix) Matrix {
-	C := MakeMat(A.rows, A.cols)
-	AddP(C, A, B)
-	return C
-}
-
-func Mul(A, B Matrix) Matrix {
-	C := MakeMat(A.rows, B.cols)
-	MulP(C, A, B)
-	return C
-}
-
-func HMul(A, B Matrix) Matrix {
-	C := MakeMat(A.rows, A.cols)
-	HMulP(C, A, B)
-	return C
-}
-
-func SMul(s float64, A Matrix) Matrix {
-	B := MakeMat(A.rows, A.cols)
-	SMulP(B, s, A)
-	return B
-}
-
-func Apply(A Matrix, fn func(float64) float64) Matrix {
-	R := MakeMat(A.rows, A.cols)
-	ApplyP(R, A, fn)
-	return R
-}
-
 func Zero(A Matrix) {
 	for i := range len(A.data) {
 		A.data[i] = 0
@@ -134,7 +104,7 @@ func Assign(A Matrix, B Matrix) {
 	copy(A.data, B.data)
 }
 
-func AddP(R Matrix, A, B Matrix) {
+func Add(R Matrix, A, B Matrix) {
 	if safe {
 		if A.rows != B.rows || A.cols != B.cols || R.rows != A.rows || R.cols != A.cols {
 			panic("matrix dimensions do not match")
@@ -146,7 +116,7 @@ func AddP(R Matrix, A, B Matrix) {
 	}
 }
 
-func AddMulP(R Matrix, A, B, C Matrix) {
+func AddMul(R Matrix, A, B, C Matrix) {
 	if safe {
 		if B.cols != C.rows || A.rows != B.rows || A.cols != C.cols || R.rows != A.rows || R.cols != A.cols {
 			panic("matrix dimensions do not match")
@@ -164,7 +134,19 @@ func AddMulP(R Matrix, A, B, C Matrix) {
 	}
 }
 
-func MulP(R Matrix, A, B Matrix) {
+func AddSMul(R Matrix, A Matrix, s float64, B Matrix) {
+	if safe {
+		if A.cols != B.cols || R.rows != A.rows || R.cols != A.cols {
+			panic("matrix dimensions do not match")
+		}
+	}
+
+	for i := range len(A.data) {
+		R.data[i] = A.data[i] + s*B.data[i]
+	}
+}
+
+func Mul(R Matrix, A, B Matrix) {
 	if safe {
 		if A.cols != B.rows || R.rows != A.rows || R.cols != B.cols {
 			panic("matrix dimensions do not match")
@@ -182,7 +164,7 @@ func MulP(R Matrix, A, B Matrix) {
 	}
 }
 
-func HMulP(R Matrix, A, B Matrix) {
+func HMul(R Matrix, A, B Matrix) {
 	if safe {
 		if A.rows != B.rows || A.cols != B.cols || R.rows != A.rows || R.cols != A.cols {
 			panic("matrix dimensions do not match")
@@ -194,7 +176,7 @@ func HMulP(R Matrix, A, B Matrix) {
 	}
 }
 
-func SMulP(R Matrix, s float64, A Matrix) {
+func SMul(R Matrix, s float64, A Matrix) {
 	if safe {
 		if R.rows != A.rows || R.cols != A.cols {
 			panic("matrix dimensions do not match")
@@ -206,7 +188,22 @@ func SMulP(R Matrix, s float64, A Matrix) {
 	}
 }
 
-func ApplyP(R Matrix, A Matrix, fn func(float64) float64) {
+func Dot(A, B Matrix) float64 {
+	if safe {
+		if A.rows != B.rows || A.cols != B.cols {
+			panic("matrix dimensions do not match")
+		}
+	}
+
+	var sum float64
+	for i := range len(A.data) {
+		sum += A.data[i] * B.data[i]
+	}
+
+	return sum
+}
+
+func Apply(R Matrix, A Matrix, fn func(float64) float64) {
 	if safe {
 		if R.rows != A.rows || R.cols != A.cols {
 			panic("matrix dimensions do not match")
