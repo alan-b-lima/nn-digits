@@ -109,8 +109,8 @@ func (nn *NeuralNetwork) feed_forward(comp *[]computation, input nnmath.Vector) 
 		layer := &nn.layers[i]
 		activation := (*comp)[i].Activation
 
-		nnmath.AddMulP(activation, layer.Biases, layer.Weights, input)
-		nnmath.ApplyP(activation, activation, Sigmoid)
+		nnmath.AddMul(activation, layer.Biases, layer.Weights, input)
+		nnmath.Apply(activation, activation, Sigmoid)
 
 		input = activation
 	}
@@ -118,7 +118,7 @@ func (nn *NeuralNetwork) feed_forward(comp *[]computation, input nnmath.Vector) 
 	last := nn.layers[len(nn.layers)-1]
 	activation := (*comp)[len(nn.layers)-1].Activation
 
-	nnmath.AddMulP(activation, last.Biases, last.Weights, input)
+	nnmath.AddMul(activation, last.Biases, last.Weights, input)
 	nnmath.Softmax(activation.Data())
 
 	input = activation
