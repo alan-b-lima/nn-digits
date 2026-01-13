@@ -31,7 +31,7 @@ func (nn *NeuralNetwork) UnmarshalJSON(buf []byte) error {
 	nn.mu.Lock()
 	defer nn.mu.Unlock()
 
-	*nn = NeuralNetwork{buf: jn.Layers}
+	nn.buf = jn.Layers
 
 	nn.layers = slice_nn(nn.buf, jn.Dimensions...)
 	nn.comp = mem.NewPool(nn.new_comp)

@@ -27,8 +27,8 @@ func init() {
 	}
 }
 
-func LoadFromCSV(r io.Reader) ([]nn.LabeledSample, error) {
-	var dataset []nn.LabeledSample
+func LoadFromCSV(r io.Reader) ([]nn.Sample, error) {
+	var dataset []nn.Sample
 
 	reader := csv.NewReader(r)
 	reader.ReuseRecord = true
@@ -60,7 +60,7 @@ func LoadFromCSV(r io.Reader) ([]nn.LabeledSample, error) {
 			return nil, fmt.Errorf("dataset: label out of range")
 		}
 
-		sample := nn.LabeledSample{
+		sample := nn.Sample{
 			Label:  Labels[label],
 			Values: nnmath.MakeVec(pixs),
 		}
@@ -83,20 +83,20 @@ func LoadFromCSV(r io.Reader) ([]nn.LabeledSample, error) {
 	return dataset, nil
 }
 
-func LoadFromJSON(r io.Reader) ([]nn.LabeledSample, error) {
+func LoadFromJSON(r io.Reader) ([]nn.Sample, error) {
 	var s []sample
 	if err := json.NewDecoder(r).Decode(&s); err != nil {
 		return nil, fmt.Errorf("dataset: parse JSON file: %w", err)
 	}
 
 	if len(s) == 0 {
-		return []nn.LabeledSample{}, nil
+		return []nn.Sample{}, nil
 	}
 
 	label_size := len(s[0].Label)
 	values_size := len(s[0].Values)
 
-	samples := make([]nn.LabeledSample, len(s))
+	samples := make([]nn.Sample, len(s))
 	buf := make([]float64, (label_size+values_size)*len(s))
 
 	for i, s := range s {
@@ -114,7 +114,7 @@ func LoadFromJSON(r io.Reader) ([]nn.LabeledSample, error) {
 		copy(label, s.Label)
 		copy(values, s.Values)
 
-		samples[i] = nn.LabeledSample{
+		samples[i] = nn.Sample{
 			Label:  nnmath.MakeVecData(label_size, label),
 			Values: nnmath.MakeVecData(values_size, values),
 		}
@@ -123,7 +123,7 @@ func LoadFromJSON(r io.Reader) ([]nn.LabeledSample, error) {
 	return samples, nil
 }
 
-func StoreToJSON(w io.Writer, samples []nn.LabeledSample) error {
+func StoreToJSON(w io.Writer, samples []nn.Sample) error {
 	ss := make([]sample, 0, len(samples))
 	for _, s := range samples {
 		ss = append(ss, sample{

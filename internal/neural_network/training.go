@@ -2,11 +2,7 @@ package nn
 
 import "github.com/alan-b-lima/nn-digits/pkg/nnmath"
 
-type NeuralNetworkInTraining struct {
-	NeuralNetwork
-}
-
-func (nn *NeuralNetwork) Learn(dataset []LabeledSample, rate float64) {
+func (nn *NeuralNetwork) Learn(dataset []Sample, rate float64) {
 	comp, learn := nn.get_learn()
 	defer nn.free_learn(comp, learn)
 
@@ -26,7 +22,7 @@ func (nn *NeuralNetwork) apply_gradient(learn *[]learning, rate float64) {
 	}
 }
 
-func (nn *NeuralNetwork) compute_gradient(comp *[]computation, learn *[]learning, dataset []LabeledSample) {
+func (nn *NeuralNetwork) compute_gradient(comp *[]computation, learn *[]learning, dataset []Sample) {
 	if len(nn.layers) == 0 {
 		return
 	}
@@ -43,7 +39,7 @@ func (nn *NeuralNetwork) compute_gradient(comp *[]computation, learn *[]learning
 
 			nn.sample_cost_derivative(comp, curr.ErrorPropagation, sample)
 
-			nnmath.SoftmaxDerivativeFromActivation(activation.Data())
+			SoftmaxDerivativeFromActivation(activation.Data())
 			nnmath.HMul(curr.ErrorPropagation, curr.ErrorPropagation, activation)
 
 			a := nnmath.MakeMatData(1, input.Rows(), input.Data())
