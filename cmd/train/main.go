@@ -7,5 +7,5 @@ import (
 )
 
 func main() {
-	repl.LaunchREPLoop(os.Stdout, os.Stdin)
+	repl.New(os.Stdout, os.Stdin)
 }

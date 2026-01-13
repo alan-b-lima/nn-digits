@@ -8,12 +8,19 @@ import (
 	"io"
 	"math/rand/v2"
 	"os"
+	"os/signal"
 	"regexp"
+	"runtime"
 	"slices"
 	"strconv"
+	"strings"
+	"syscall"
 
 	"github.com/alan-b-lima/nn-digits/internal/dataset"
 	nn "github.com/alan-b-lima/nn-digits/internal/neural_network"
+	"github.com/alan-b-lima/nn-digits/pkg/work"
+
+	"golang.org/x/term"
 )
 
 type Directive func(*State, io.Writer, io.Reader, ...string) error
@@ -21,8 +28,8 @@ type Directive func(*State, io.Writer, io.Reader, ...string) error
 type Context struct {
 	NeuralNetwork *nn.NeuralNetwork
 
-	Training []nn.LabeledSample
-	Tests    []nn.LabeledSample
+	Training []nn.Sample
+	Tests    []nn.Sample
 
 	LearningRate float64
 	Unsaved      bool
@@ -31,6 +38,8 @@ type Context struct {
 type State struct {
 	ctxs  map[string]*Context
 	focus string
+
+	signals <-chan os.Signal
 }
 
 func (s *State) Unsaved() bool {
@@ -53,23 +62,28 @@ var (
 )
 
 var directives = map[string]Directive{
-	"help":   Help,
-	"new":    New,
-	"list":   List,
-	"focus":  Focus,
-	"load":   Load,
-	"store":  Store,
-	"train":  Train,
-	"cycle":  Cycle,
-	"status": Status,
-	"rate":   LearningRate,
-	"exit":   Quit,
-	"quit":   Quit,
+	"help":   CommandHelp,
+	"new":    CommandNew,
+	"list":   CommandList,
+	"focus":  CommandFocus,
+	"load":   CommandLoad,
+	"store":  CommandStore,
+	"train":  CommandTrain,
+	"cycle":  CommandCycle,
+	"status": CommandStatus,
+	"rate":   CommandRate,
+	"clear":  CommandClear,
+	"exit":   CommandQuit,
+	"quit":   CommandQuit,
 }
 
-func LaunchREPLoop(w io.Writer, r io.Reader) {
+func New(w io.Writer, r io.Reader) {
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, syscall.SIGTERM, syscall.SIGINT)
+
 	state := State{
-		ctxs: make(map[string]*Context),
+		ctxs:    make(map[string]*Context),
+		signals: signals,
 	}
 
 	reader := bufio.NewReader(r)
@@ -111,7 +125,7 @@ var (
 
 	ErrNewMissingArgs       = errors.New("bad args: new <name> { <dims> }")
 	ErrNewMissingDimensions = errors.New("bad args: there must be at least two dimensions")
-	ErrLoadMissingArgs      = errors.New("bad args: store ( model <name> | training  | tests ) <path>")
+	ErrLoadMissingArgs      = errors.New("bad args: load ( model <name> | training | tests ) <path>")
 	ErrStoreMissingArgs     = errors.New("bad args: store model <path>")
 	ErrTrainMissingArgs     = errors.New("bad args: train <size>")
 	ErrCycleMissingArgs     = errors.New("bad args: cycle <size> <iterations>")
@@ -124,12 +138,12 @@ var (
 	ErrBadNumber        = func(err error) error { return fmt.Errorf("bad number: %w", err) }
 )
 
-func Help(state *State, w io.Writer, _ io.Reader, args ...string) error {
+func CommandHelp(state *State, w io.Writer, _ io.Reader, args ...string) error {
 	fmt.Fprintln(w, help)
 	return nil
 }
 
-func New(state *State, w io.Writer, r io.Reader, args ...string) error {
+func CommandNew(state *State, w io.Writer, r io.Reader, args ...string) error {
 	if len(args) < 1 {
 		return ErrNewMissingArgs
 	}
@@ -162,7 +176,7 @@ func New(state *State, w io.Writer, r io.Reader, args ...string) error {
 	}
 
 	state.ctxs[name] = &Context{
-		NeuralNetwork: &nn,
+		NeuralNetwork: nn,
 		Unsaved:       true,
 	}
 
@@ -170,7 +184,7 @@ func New(state *State, w io.Writer, r io.Reader, args ...string) error {
 	return nil
 }
 
-func List(state *State, w io.Writer, _ io.Reader, args ...string) error {
+func CommandList(state *State, w io.Writer, _ io.Reader, args ...string) error {
 	keys := make([]string, 0, len(state.ctxs))
 	for k := range state.ctxs {
 		keys = append(keys, k)
@@ -188,7 +202,7 @@ func List(state *State, w io.Writer, _ io.Reader, args ...string) error {
 	return nil
 }
 
-func Focus(state *State, w io.Writer, _ io.Reader, args ...string) error {
+func CommandFocus(state *State, w io.Writer, _ io.Reader, args ...string) error {
 	if len(args) < 1 {
 		fmt.Fprintln(w, state.focus)
 		return nil
@@ -207,23 +221,19 @@ func Focus(state *State, w io.Writer, _ io.Reader, args ...string) error {
 	return nil
 }
 
-func Load(state *State, w io.Writer, r io.Reader, args ...string) error {
+func CommandLoad(state *State, w io.Writer, r io.Reader, args ...string) error {
 	if len(args) < 2 {
 		return ErrLoadMissingArgs
 	}
 
-	path := args[1]
-	ctx := state.Focused()
-	if ctx == nil {
-		return ErrNilContext
-	}
-
-	switch directive := args[0]; directive {
-	case "model":
+	directive := args[0]
+	if directive == "model" {
 		if len(args) < 3 {
 			return ErrLoadMissingArgs
 		}
-		name := args[2]
+
+		name := args[1]
+		path := args[2]
 
 		nn, err := load_model(path)
 		if err != nil {
@@ -239,44 +249,51 @@ func Load(state *State, w io.Writer, r io.Reader, args ...string) error {
 
 		state.ctxs[name] = &Context{
 			NeuralNetwork: nn,
-			Unsaved:       true,
+			Unsaved:       false,
 		}
 
-	case "training":
-		data, err := load_data(path)
-		if err != nil {
-			return fmt.Errorf("load training: %w", err)
-		}
-		if len(data) == 0 {
-			return nil
-		}
+		state.focus = name
+		return nil
+	}
 
-		if e, i := ctx.NeuralNetwork.Layers[0].Weights.Cols(), data[0].Values.Rows(); e != i {
-			return ErrBadInput(e, i)
-		}
-
-		if e, o := ctx.NeuralNetwork.Layers[len(ctx.NeuralNetwork.Layers)-1].Weights.Rows(), data[0].Label.Rows(); e != o {
-			return ErrBadInput(e, o)
-		}
-
-		ctx.Training = append(ctx.Training, data...)
-
-	case "tests":
-		data, err := load_data(path)
-		if err != nil {
-			return fmt.Errorf("load tests: %w", err)
-		}
-
-		ctx.Tests = append(ctx.Tests, data...)
-
+	switch directive {
+	case "training", "tests":
 	default:
 		return ErrUnknownDirective(directive)
+	}
+
+	ctx := state.Focused()
+	if ctx == nil {
+		return ErrNilContext
+	}
+	path := args[1]
+
+	data, err := load_data(path)
+	if err != nil {
+		return fmt.Errorf("load data: %w", err)
+	}
+	if len(data) == 0 {
+		return nil
+	}
+
+	if e, i := ctx.NeuralNetwork.InLen(), data[0].Values.Rows(); e != i {
+		return ErrBadInput(e, i)
+	}
+
+	if e, o := ctx.NeuralNetwork.OutLen(), data[0].Label.Rows(); e != o {
+		return ErrBadInput(e, o)
+	}
+
+	if directive == "training" {
+		ctx.Training = append(ctx.Training, data...)
+	} else {
+		ctx.Tests = append(ctx.Tests, data...)
 	}
 
 	return nil
 }
 
-func Store(state *State, w io.Writer, r io.Reader, args ...string) error {
+func CommandStore(state *State, w io.Writer, r io.Reader, args ...string) error {
 	if len(args) < 2 {
 		return ErrStoreMissingArgs
 	}
@@ -296,68 +313,191 @@ func Store(state *State, w io.Writer, r io.Reader, args ...string) error {
 		return fmt.Errorf("store model: %w", err)
 	}
 
+	ctx.Unsaved = false
 	return nil
 }
 
-func Train(state *State, w io.Writer, _ io.Reader, args ...string) error {
+func CommandTrain(state *State, w io.Writer, _ io.Reader, args ...string) error {
 	if len(args) < 1 {
 		return ErrTrainMissingArgs
 	}
 
-	size, err := strconv.Atoi(args[0])
-	if err != nil {
-		return ErrBadNumber(err)
-	}
-
 	ctx := state.Focused()
 	if ctx == nil {
 		return ErrNilContext
 	}
 
-	learn_batch(ctx.NeuralNetwork, ctx.Training, ctx.LearningRate, size)
+	size, err := strconv.Atoi(args[0])
+	if err != nil {
+		return ErrBadNumber(err)
+	}
+
+	iterations := 1
+	if len(args) >= 2 {
+		iterations, err = strconv.Atoi(args[1])
+		if err != nil {
+			return ErrBadNumber(err)
+		}
+		if iterations < 1 {
+			return nil
+		}
+	}
+
+	if iterations == 1 {
+		learn_batch(ctx.NeuralNetwork, ctx.Training, ctx.LearningRate, size)
+	} else {
+		for i := range iterations {
+			fmt.Fprintf(w, "\r%d/%d", i+1, iterations)
+			learn_batch(ctx.NeuralNetwork, ctx.Training, ctx.LearningRate, size)
+		}
+		fmt.Fprintln(w)
+	}
 
 	ctx.Unsaved = true
 	return nil
 }
 
-func Cycle(state *State, w io.Writer, _ io.Reader, args ...string) error {
-	if len(args) < 2 {
+func CommandCycle(state *State, w io.Writer, _ io.Reader, args ...string) error {
+	if len(args) < 1 {
 		return ErrCycleMissingArgs
 	}
 
-	size, err := strconv.Atoi(args[0])
-	if err != nil {
-		return ErrBadNumber(err)
-	}
-
-	iterations, err := strconv.Atoi(args[1])
-	if err != nil {
-		return ErrBadNumber(err)
-	}
-
 	ctx := state.Focused()
 	if ctx == nil {
 		return ErrNilContext
 	}
 
-	for i := range iterations {
-		fmt.Fprintf(w, "\r%d/%d", i+1, iterations)
-		learn_batch(ctx.NeuralNetwork, ctx.Training, ctx.LearningRate, size)
+	size, err := strconv.Atoi(args[0])
+	if err != nil {
+		return ErrBadNumber(err)
 	}
-	fmt.Fprintln(w)
 
-	ctx.Unsaved = true
-	return nil
+	iterations := 1
+	if len(args) >= 2 {
+		iterations, err = strconv.Atoi(args[1])
+		if err != nil {
+			return ErrBadNumber(err)
+		}
+		if iterations < 1 {
+			return nil
+		}
+	}
+
+	train := make(chan struct{}, 1)
+	tests := make(chan []nn.Sample, 1)
+
+	pool := work.New(runtime.NumCPU())
+
+	train <- struct{}{}
+	tests <- nil
+
+	io.WriteString(w, "\033[?1049h")
+	defer io.WriteString(w, "\033[?1049l")
+
+	var cycle int
+	var costs []float64
+	var quitting bool
+
+	for {
+		select {
+		case <-train:
+			pool.Enqueue(func() {
+				cycle++
+
+				var batch []nn.Sample
+				for range iterations {
+					batch = ctx.Training
+					if size < len(batch) {
+						offset := rand.IntN(len(batch) - size)
+						batch = batch[offset : offset+size]
+					}
+
+					ctx.NeuralNetwork.Learn(batch, ctx.LearningRate)
+				}
+
+				train <- struct{}{}
+				if len(tests) == 0 {
+					tests <- batch
+				}
+			})
+
+		case training := <-tests:
+			pool.Enqueue(func() {
+				tcorrect, tcost := ctx.NeuralNetwork.Cost(training)
+				correct, cost := ctx.NeuralNetwork.Cost(ctx.Tests)
+
+				var b strings.Builder
+
+				fmt.Fprint(&b, "\033[1;1H")
+				fmt.Fprintf(&b, "Cycle %d\n", cycle)
+				fmt.Fprintf(&b, "\033[KLearning rate: %f\n", ctx.LearningRate)
+
+				fmt.Fprint(&b, "\nTraining:\n")
+				fmt.Fprintf(&b, "\033[K\tCorrect: %d/%d\n", tcorrect, len(training))
+				// fmt.Fprintf(&b,"\tMin Cost: %f\n", station.MinTrainingCost)
+				fmt.Fprintf(&b, "\033[K\tCost: %f\n", tcost)
+				fmt.Fprintf(&b, "\033[K\tError rate: %.2f%%\n", 100*(1-float64(tcorrect)/float64(len(training))))
+
+				fmt.Fprint(&b, "\nTests:\n")
+				fmt.Fprintf(&b, "\033[K\tCorrect: %d/%d\n", correct, len(ctx.Tests))
+				// fmt.Fprintf(&b,"\tMin Cost: %f\n", station.MinTestCost)
+				fmt.Fprintf(&b, "\033[K\tCost: %f\n", cost)
+				fmt.Fprintf(&b, "\033[K\tError rate: %.2f%%\n", 100*(1-float64(correct)/float64(len(ctx.Tests))))
+
+				status := b.String()
+
+				w, ok := w.(interface {
+					io.Writer
+					Fd() uintptr
+				})
+				if !ok {
+					fmt.Print(status)
+					return
+				}
+
+				width, height, err := term.GetSize(int(w.Fd()))
+				if err != nil {
+					fmt.Print(status)
+					return
+				}
+
+				costs = append(costs, cost)
+
+				n, graph := Graph(costs, width, height-strings.Count(status, "\n"))
+				b.WriteString(graph)
+
+				if quitting {
+					fmt.Print(b.String() + "^C")
+				} else {
+					fmt.Print(b.String())
+				}
+
+				if limit := 2 * n; len(costs) > limit {
+					copy(costs[0:limit], costs[len(costs)-limit:])
+					costs = costs[:limit]
+				}
+			})
+
+		case <-state.signals:
+			quitting = true
+
+			pool.Stop()
+			pool.Wait()
+
+			ctx.Unsaved = true
+			return nil
+		}
+	}
 }
 
-func Status(state *State, w io.Writer, _ io.Reader, args ...string) error {
+func CommandStatus(state *State, w io.Writer, _ io.Reader, args ...string) error {
 	ctx := state.Focused()
 	if ctx == nil {
 		return ErrNilContext
 	}
 
 	total := len(ctx.Tests)
-	correct, cost := ctx.NeuralNetwork.Status(ctx.Tests)
+	correct, cost := ctx.NeuralNetwork.Cost(ctx.Tests)
 
 	fmt.Fprintf(w,
 		"Correct: %d\nIncorrect: %d\nTotal: %d\nPerformance: %.2f%%\n\nCost: %f\n",
@@ -367,7 +507,7 @@ func Status(state *State, w io.Writer, _ io.Reader, args ...string) error {
 	return nil
 }
 
-func LearningRate(state *State, w io.Writer, _ io.Reader, args ...string) error {
+func CommandRate(state *State, w io.Writer, _ io.Reader, args ...string) error {
 	ctx := state.Focused()
 	if ctx == nil {
 		return ErrNilContext
@@ -387,7 +527,12 @@ func LearningRate(state *State, w io.Writer, _ io.Reader, args ...string) error 
 	return nil
 }
 
-func Quit(state *State, w io.Writer, r io.Reader, args ...string) error {
+func CommandClear(s *State, w io.Writer, _ io.Reader, _ ...string) error {
+	w.Write([]byte{0o33, 'c'})
+	return nil
+}
+
+func CommandQuit(state *State, w io.Writer, r io.Reader, _ ...string) error {
 	if !state.Unsaved() {
 		return QuitMessage
 	}
@@ -435,13 +580,13 @@ func overwrite_loop(w io.Writer, r io.Reader, name string) (bool, error) {
 	}
 }
 
-func learn_batch(nn *nn.NeuralNetwork, training []nn.LabeledSample, rate float64, size int) {
-	if size < len(training) {
-		offset := rand.IntN(len(training) - size)
-		training = training[offset : offset+size]
+func learn_batch(nn *nn.NeuralNetwork, dataset []nn.Sample, rate float64, size int) {
+	if size < len(dataset) {
+		offset := rand.IntN(len(dataset) - size)
+		dataset = dataset[offset : offset+size]
 	}
 
-	nn.Learn(training, rate)
+	nn.Learn(dataset, rate)
 }
 
 func store_model(path string, nn *nn.NeuralNetwork) error {
@@ -460,7 +605,7 @@ func store_model(path string, nn *nn.NeuralNetwork) error {
 	return err
 }
 
-func load_data(path string) ([]nn.LabeledSample, error) {
+func load_data(path string) ([]nn.Sample, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -485,7 +630,7 @@ func load_model(path string) (*nn.NeuralNetwork, error) {
 	return &nn, nil
 }
 
-const help = `NN Digits v0.0.2
+const help = `NN Digits v0.0.3
 
 NN Digits is an interactive shell for training a basic Multilayer Perceptron.
 
@@ -529,19 +674,25 @@ NN Digits is an interactive shell for training a basic Multilayer Perceptron.
 	rate <rate>
 		changes the learning rate of the focused model.
 
-	train <size>
-		trains the network on a batch of size <size>. If <size>
-		exceeds the number of training samples, all avalaible
-		training samples will be used.
-
-	cycle <size> <iterations>
+	train <size> [<iterations>]
 		trains the network <iterations> times on batches of size
 		<size>, batches are chosen randomly and contiguously out of
 		the training set. If <size> exceeds the number of training
 		samples, all avalaible training samples will be used.
 
+	cycle <size> [<iterations>]
+		cycles the network on training, it will train the network on
+		a batch of size <size>, <iterations> times, before trying to
+		test the network and printing to the screen, more than a
+		training cycle might be finished before a test cycle
+		fisishes, the cycle counter may seem to skip numbers. To quit
+		this mode, flash ^C and wait.
+
 	help
 		shows this screen.
+
+	clear
+		clears the screen.
 
 	quit
 	exit
