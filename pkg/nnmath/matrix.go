@@ -163,6 +163,27 @@ func Assign(A Matrix, B Matrix) {
 	)
 }
 
+// Reshape reshapes a matrix into another shape without messing with single
+// entries. It does not describe any general linear algebra operation.
+//
+// As a special case, may be used to transpose row- or column-vectors.
+//
+// Reshape panics if the size of the matrix does not fit perfectly in the
+// desired shape. 
+func Reshape(M Matrix, rows, cols int) Matrix {
+	if safe {
+		if M.Size() != rows*cols {
+			panic("matrix dimensions do not match")
+		}
+	}
+
+	return Matrix{
+		rows: rows,
+		cols: cols,
+		data: M.data,
+	}
+}
+
 // Add adds two matrices. For R, A, B in [n x m], Add(R, A, B) describes
 // R = A + B.
 //
