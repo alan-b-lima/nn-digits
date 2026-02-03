@@ -80,7 +80,7 @@ func (M Matrix) Size() int {
 }
 
 // Dim returns the dimensions of the matrix.
-func (M Matrix) Dim() (row, col int) {
+func (M Matrix) Dims() (row, col int) {
 	return M.rows, M.cols
 }
 
@@ -131,10 +131,22 @@ func (M Matrix) Set(row, col int, value float64) {
 }
 
 func (M Matrix) at(index int) float64 {
+	if safe {
+		if size := M.Size(); index < 0 || index < size {
+			panic(fmt.Sprintf("index out of range [%d] with length %d", index, size))
+		}
+	}
+
 	return *(*float64)(unsafe.Add(unsafe.Pointer(M.data), 8*index))
 }
 
 func (M Matrix) set(index int, val float64) {
+	if safe {
+		if size := M.Size(); index < 0 || index < size {
+			panic(fmt.Sprintf("index out of range [%d] with length %d", index, size))
+		}
+	}
+
 	*(*float64)(unsafe.Add(unsafe.Pointer(M.data), 8*index)) = val
 }
 
@@ -149,18 +161,16 @@ func Zero(A Matrix) {
 //
 // Assign panics if the dimensions of the two matrices don't have the same
 // dimensions.
-func Assign(A Matrix, B Matrix) {
+func Assign(Dst Matrix, Src Matrix) {
 	if safe {
-		if A.rows != B.rows || A.cols != B.cols {
+		if Dst.rows != Src.rows || Dst.cols != Src.cols {
 			panic("matrix dimensions do not match")
 		}
 	}
 
-	size := A.Size()
-	copy(
-		unsafe.Slice(A.data, size),
-		unsafe.Slice(B.data, size),
-	)
+	for i := range Dst.Size() {
+		Dst.set(i, Src.at(i))
+	}
 }
 
 // Reshape reshapes a matrix into another shape without messing with single
@@ -169,7 +179,7 @@ func Assign(A Matrix, B Matrix) {
 // As a special case, may be used to transpose row- or column-vectors.
 //
 // Reshape panics if the size of the matrix does not fit perfectly in the
-// desired shape. 
+// desired shape.
 func Reshape(M Matrix, rows, cols int) Matrix {
 	if safe {
 		if M.Size() != rows*cols {
@@ -200,6 +210,22 @@ func Add(R Matrix, A, B Matrix) {
 	}
 }
 
+// Sub subtracts two matrices. For R, A, B in [n x m], Sub(R, A, B)
+// describes R = A - B.
+//
+// Sub panics if the dimensions of the three matrices don't match.
+func Sub(R Matrix, A, B Matrix) {
+	if safe {
+		if R.rows != A.rows || R.cols != A.cols || A.rows != B.rows || A.cols != B.cols {
+			panic("matrix dimensions do not match")
+		}
+	}
+
+	for i := range A.Size() {
+		R.set(i, A.at(i)-B.at(i))
+	}
+}
+
 // AddMul computes the multiplication of two matrices and adds the result to a
 // third matrix. For R, A in [n x m], B in [n x p], C in [p x m],
 // AddMul(R, A, B, C) describes R = A + B * C.
@@ -212,17 +238,15 @@ func AddMul(R Matrix, A, B, C Matrix) {
 		}
 	}
 
-	jclim := B.cols * B.cols
-
-	var i int
-	for jc := 0; jc < jclim; jc += B.cols {
-		for k := range C.cols {
-			sum := A.at(i)
-			for l, lc := 0, 0; l < B.cols; l, lc = l+1, lc+B.cols {
-				sum += B.at(jc+l) * C.at(lc+k)
+	var rc int
+	for i, ic := 0, 0; i < B.rows; i, ic = i+1, ic+B.cols {
+		for j := range C.cols {
+			sum := A.at(rc)
+			for k, kc := 0, 0; k < B.cols; k, kc = k+1, kc+C.cols {
+				sum += B.at(ic+k) * C.at(kc+j)
 			}
-			R.set(i, sum)
-			i++
+			R.set(rc, sum)
+			rc++
 		}
 	}
 }
@@ -255,17 +279,15 @@ func Mul(R Matrix, A, B Matrix) {
 		}
 	}
 
-	jclim := B.cols * B.cols
-
-	var i int
-	for jc := 0; jc < jclim; jc += A.cols {
-		for k := range B.cols {
+	var rc int
+	for i, ic := 0, 0; i < A.rows; i, ic = i+1, ic+A.cols {
+		for j := range B.cols {
 			var sum float64
-			for l, lc := 0, 0; l < A.cols; l, lc = l+1, lc+A.cols {
-				sum += A.at(jc+l) * B.at(lc+k)
+			for k, kc := 0, 0; k < A.cols; k, kc = k+1, kc+B.cols {
+				sum += A.at(ic+k) * B.at(kc+j)
 			}
-			R.set(i, sum)
-			i++
+			R.set(rc, sum)
+			rc++
 		}
 	}
 }
