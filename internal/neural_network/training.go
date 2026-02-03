@@ -31,19 +31,19 @@ func (nn *NeuralNetwork) compute_gradient(comp *[]computation, learn *[]learning
 		{
 			input := sample.Values
 			if len(nn.layers) > 1 {
-				input = (*comp)[len(nn.layers)-2].Activation
+				input = (*comp)[len(*comp)-2].Activation
 			}
 
-			activation := (*comp)[len(nn.layers)-1].Activation
-			curr := (*learn)[len(nn.layers)-1]
+			activation := (*comp)[len(*comp)-1].Activation
+			curr := (*learn)[len(*learn)-1]
 
 			nn.sample_cost_derivative(comp, curr.ErrorPropagation, sample)
 
-			SoftmaxDerivativeFromActivation(activation.Data())
+			SoftmaxDerivativeFromActivation(activation)
 			nnmath.HMul(curr.ErrorPropagation, curr.ErrorPropagation, activation)
 
-			a := nnmath.MakeMatData(1, input.Rows(), input.Data())
-			nnmath.AddMul(curr.WeightGradient, curr.WeightGradient, curr.ErrorPropagation, a)
+			input_t := nnmath.Reshape(input, 1, input.Rows())
+			nnmath.AddMul(curr.WeightGradient, curr.WeightGradient, curr.ErrorPropagation, input_t)
 			nnmath.Add(curr.BiasGradient, curr.BiasGradient, curr.ErrorPropagation)
 		}
 
@@ -58,15 +58,15 @@ func (nn *NeuralNetwork) compute_gradient(comp *[]computation, learn *[]learning
 			next := (*learn)[i+1]
 			curr := (*learn)[i]
 
-			t := nnmath.MakeMatData(1, next.ErrorPropagation.Rows(), next.ErrorPropagation.Data())
-			r := nnmath.MakeMatData(1, curr.ErrorPropagation.Rows(), curr.ErrorPropagation.Data())
-			nnmath.Mul(r, t, nn.layers[i+1].Weights)
+			next_error_t := nnmath.Reshape(next.ErrorPropagation, 1, next.ErrorPropagation.Rows())
+			curr_error_t := nnmath.Reshape(curr.ErrorPropagation, 1, curr.ErrorPropagation.Rows())
+			nnmath.Mul(curr_error_t, next_error_t, nn.layers[i+1].Weights)
 
-			nnmath.Apply(activation, activation, SigmoidDerivativeFromActivation)
+			nnmath.Apply(activation, activation, ReLUDerivativeFromActivation)
 			nnmath.HMul(curr.ErrorPropagation, curr.ErrorPropagation, activation)
 
-			a := nnmath.MakeMatData(1, input.Rows(), input.Data())
-			nnmath.AddMul(curr.WeightGradient, curr.WeightGradient, curr.ErrorPropagation, a)
+			input_t := nnmath.MakeMatData(1, input.Rows(), input.Data())
+			nnmath.AddMul(curr.WeightGradient, curr.WeightGradient, curr.ErrorPropagation, input_t)
 			nnmath.Add(curr.BiasGradient, curr.BiasGradient, curr.ErrorPropagation)
 		}
 		nn.mu.RUnlock()

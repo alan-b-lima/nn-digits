@@ -6,15 +6,14 @@ import (
 	"github.com/alan-b-lima/nn-digits/pkg/nnmath"
 )
 
-func (nn *NeuralNetwork) Cost(dataset []Sample) (int, float64) {
-	var cost float64
-	var correct int
-
+func (nn *NeuralNetwork) Performance(dataset []Sample) (correct int, cost float64) {
 	comp := nn.get_comp()
 	defer nn.free_comp(comp)
 
 	for _, sample := range dataset {
-		output := nn.feed_forward(comp, sample.Values).Data()
+		nn.feed_forward(comp, sample.Values)
+
+		output := (*comp)[len(*comp)-1].Activation.Data()
 		expected := sample.Label.Data()
 
 		for i := range len(output) {
@@ -33,14 +32,13 @@ func (nn *NeuralNetwork) Cost(dataset []Sample) (int, float64) {
 	return correct, .5 * cost / float64(len(dataset))
 }
 
-func (nn *NeuralNetwork) sample_cost_derivative(learn *[]computation, cost nnmath.Vector, sample Sample) {
-	output := nn.feed_forward(learn, sample.Values).Data()
-	expected := sample.Label.Data()
+func (nn *NeuralNetwork) sample_cost_derivative(comp *[]computation, cost nnmath.Vector, sample Sample) {
+	nn.feed_forward(comp, sample.Values)
 
-	vector := cost.Data()
-	for i := range len(output) {
-		vector[i] = output[i] - expected[i]
-	}
+	output := (*comp)[len(*comp)-1].Activation
+	expected := sample.Label
+
+	nnmath.Sub(cost, output, expected)
 }
 
 func index_of_max[T ~[]E, E cmp.Ordered](s T) int {

@@ -63,13 +63,13 @@ func (nn *NeuralNetwork) Len() int {
 	return len(nn.layers) + 1
 }
 
-// InLen returns the number of input neurons in the network.
-func (nn *NeuralNetwork) InLen() int {
+// Features returns the number of input neurons in the network.
+func (nn *NeuralNetwork) Features() int {
 	return nn.layers[0].Weights.Cols()
 }
 
-// OutLen returns the number of output neurons in the network.
-func (nn *NeuralNetwork) OutLen() int {
+// Responses returns the number of output neurons in the network.
+func (nn *NeuralNetwork) Responses() int {
 	return nn.layers[len(nn.layers)-1].Weights.Rows()
 }
 
@@ -89,20 +89,26 @@ func (nn *NeuralNetwork) Dims() []int {
 // FeedForward computes the output of the neural network given an input vector.
 //
 // FeedForward panics if the input is not a matrix [n x 1] (a vector of length
-// n), where n = [NeuralNetwork.InLen]().
+// n), where n = [NeuralNetwork.Features]().
 func (nn *NeuralNetwork) FeedForward(input nnmath.Vector) nnmath.Vector {
 	comp := nn.get_comp()
 	defer nn.free_comp(comp)
 
-	return nn.feed_forward(comp, input)
+	nn.feed_forward(comp, input)
+	activation := (*comp)[len(*comp)-1].Activation
+
+	result := nnmath.MakeVec(activation.Size())
+	nnmath.Assign(result, activation)
+
+	return result
 }
 
-func (nn *NeuralNetwork) feed_forward(comp *[]computation, input nnmath.Vector) nnmath.Vector {
+func (nn *NeuralNetwork) feed_forward(comp *[]computation, input nnmath.Vector) {
 	nn.mu.RLock()
 	defer nn.mu.RUnlock()
 
 	if len(nn.layers) == 0 {
-		return nnmath.Vector{}
+		return
 	}
 
 	for i := range nn.layers[:len(nn.layers)-1] {
@@ -110,7 +116,7 @@ func (nn *NeuralNetwork) feed_forward(comp *[]computation, input nnmath.Vector) 
 		activation := (*comp)[i].Activation
 
 		nnmath.AddMul(activation, layer.Biases, layer.Weights, input)
-		nnmath.Apply(activation, activation, Sigmoid)
+		nnmath.Apply(activation, activation, ReLU)
 
 		input = activation
 	}
@@ -119,10 +125,7 @@ func (nn *NeuralNetwork) feed_forward(comp *[]computation, input nnmath.Vector) 
 	activation := (*comp)[len(nn.layers)-1].Activation
 
 	nnmath.AddMul(activation, last.Biases, last.Weights, input)
-	Softmax(activation.Data())
-
-	input = activation
-	return activation
+	Softmax(activation)
 }
 
 type computation struct {
@@ -141,7 +144,7 @@ func (nn *NeuralNetwork) new_comp() *[]computation {
 
 	var size int
 	for _, layer := range nn.layers {
-		next, _ := layer.Weights.Dim()
+		next, _ := layer.Weights.Dims()
 		size += next
 	}
 
@@ -170,7 +173,7 @@ func (nn *NeuralNetwork) new_learn() *[]learning {
 
 	var size int
 	for _, layer := range nn.layers {
-		next, curr := layer.Weights.Dim()
+		next, curr := layer.Weights.Dims()
 		size += next*curr + next + next
 	}
 
@@ -178,7 +181,7 @@ func (nn *NeuralNetwork) new_learn() *[]learning {
 	learn := make([]learning, len(nn.layers))
 
 	for i, layer := range nn.layers {
-		next, curr := layer.Weights.Dim()
+		next, curr := layer.Weights.Dims()
 
 		learn[i].WeightGradient = nnmath.MakeMatData(next, curr, mem.Take(&buf, next*curr))
 		learn[i].BiasGradient = nnmath.MakeVecData(next, mem.Take(&buf, next))
