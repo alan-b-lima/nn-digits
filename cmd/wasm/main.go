@@ -8,7 +8,7 @@ import (
 	"syscall/js"
 
 	"github.com/alan-b-lima/nn-digits/internal/digits"
-	"github.com/alan-b-lima/nn-digits/internal/neural_network"
+	nn "github.com/alan-b-lima/nn-digits/internal/neural_network"
 )
 
 func main() {
@@ -74,7 +74,7 @@ func Classify(classifier digits.Classifier) func(js.Value, []js.Value) any {
 			data[i] = val.Float()
 		}
 
-		res, err := classifier.Classify(data)
+		res, err := classifier.Classify(&data)
 		if err != nil {
 			return Error.New(err.Error())
 		}
