@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/signal"
 	"regexp"
-	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -18,7 +17,6 @@ import (
 
 	"github.com/alan-b-lima/nn-digits/internal/dataset"
 	nn "github.com/alan-b-lima/nn-digits/internal/neural_network"
-	"github.com/alan-b-lima/nn-digits/pkg/work"
 
 	"golang.org/x/term"
 )
@@ -32,7 +30,11 @@ type Context struct {
 	Tests    []nn.Sample
 
 	LearningRate float64
-	Unsaved      bool
+
+	Cycle     int
+	Evolution []float64
+
+	Unsaved bool
 }
 
 type State struct {
@@ -276,11 +278,11 @@ func CommandLoad(state *State, w io.Writer, r io.Reader, args ...string) error {
 		return nil
 	}
 
-	if e, i := ctx.NeuralNetwork.InLen(), data[0].Values.Rows(); e != i {
+	if e, i := ctx.NeuralNetwork.Features(), data[0].Values.Rows(); e != i {
 		return ErrBadInput(e, i)
 	}
 
-	if e, o := ctx.NeuralNetwork.OutLen(), data[0].Label.Rows(); e != o {
+	if e, o := ctx.NeuralNetwork.Responses(), data[0].Label.Rows(); e != o {
 		return ErrBadInput(e, o)
 	}
 
@@ -344,11 +346,14 @@ func CommandTrain(state *State, w io.Writer, _ io.Reader, args ...string) error 
 	}
 
 	if iterations == 1 {
-		learn_batch(ctx.NeuralNetwork, ctx.Training, ctx.LearningRate, size)
+		learn_batch(ctx, size)
+		ctx.Cycle++
 	} else {
 		for i := range iterations {
 			fmt.Fprintf(w, "\r%d/%d", i+1, iterations)
-			learn_batch(ctx.NeuralNetwork, ctx.Training, ctx.LearningRate, size)
+
+			ctx.Cycle++
+			learn_batch(ctx, size)
 		}
 		fmt.Fprintln(w)
 	}
@@ -383,111 +388,97 @@ func CommandCycle(state *State, w io.Writer, _ io.Reader, args ...string) error 
 		}
 	}
 
-	train := make(chan struct{}, 1)
-	tests := make(chan []nn.Sample, 1)
-
-	pool := work.New(runtime.NumCPU())
-
-	train <- struct{}{}
-	tests <- nil
-
 	io.WriteString(w, "\033[?1049h")
 	defer io.WriteString(w, "\033[?1049l")
 
-	var cycle int
-	var costs []float64
+	var closed_for_test bool
+	test := make(chan int, 1)
+
+	quit := make(chan struct{}, 1)
 	var quitting bool
 
-	for {
-		select {
-		case <-train:
-			pool.Enqueue(func() {
-				cycle++
+	go func() {
+		for {
+			select {
+			default:
+				ctx.Cycle++
 
-				var batch []nn.Sample
 				for range iterations {
-					batch = ctx.Training
-					if size < len(batch) {
-						offset := rand.IntN(len(batch) - size)
-						batch = batch[offset : offset+size]
-					}
-
-					ctx.NeuralNetwork.Learn(batch, ctx.LearningRate)
+					learn_batch(ctx, size)
 				}
 
-				train <- struct{}{}
-				if len(tests) == 0 {
-					tests <- batch
-				}
-			})
-
-		case training := <-tests:
-			pool.Enqueue(func() {
-				tcorrect, tcost := ctx.NeuralNetwork.Cost(training)
-				correct, cost := ctx.NeuralNetwork.Cost(ctx.Tests)
-
-				var b strings.Builder
-
-				fmt.Fprint(&b, "\033[1;1H")
-				fmt.Fprintf(&b, "Cycle %d\n", cycle)
-				fmt.Fprintf(&b, "\033[KLearning rate: %f\n", ctx.LearningRate)
-
-				fmt.Fprint(&b, "\nTraining:\n")
-				fmt.Fprintf(&b, "\033[K\tCorrect: %d/%d\n", tcorrect, len(training))
-				// fmt.Fprintf(&b,"\tMin Cost: %f\n", station.MinTrainingCost)
-				fmt.Fprintf(&b, "\033[K\tCost: %f\n", tcost)
-				fmt.Fprintf(&b, "\033[K\tError rate: %.2f%%\n", 100*(1-float64(tcorrect)/float64(len(training))))
-
-				fmt.Fprint(&b, "\nTests:\n")
-				fmt.Fprintf(&b, "\033[K\tCorrect: %d/%d\n", correct, len(ctx.Tests))
-				// fmt.Fprintf(&b,"\tMin Cost: %f\n", station.MinTestCost)
-				fmt.Fprintf(&b, "\033[K\tCost: %f\n", cost)
-				fmt.Fprintf(&b, "\033[K\tError rate: %.2f%%\n", 100*(1-float64(correct)/float64(len(ctx.Tests))))
-
-				status := b.String()
-
-				w, ok := w.(interface {
-					io.Writer
-					Fd() uintptr
-				})
-				if !ok {
-					fmt.Print(status)
-					return
+				if !closed_for_test {
+					test <- ctx.Cycle
+					closed_for_test = true
 				}
 
-				width, height, err := term.GetSize(int(w.Fd()))
-				if err != nil {
-					fmt.Print(status)
-					return
-				}
-
-				costs = append(costs, cost)
-
-				n, graph := Graph(costs, width, height-strings.Count(status, "\n"))
-				b.WriteString(graph)
-
-				if quitting {
-					fmt.Print(b.String() + "^C")
-				} else {
-					fmt.Print(b.String())
-				}
-
-				if limit := 2 * n; len(costs) > limit {
-					copy(costs[0:limit], costs[len(costs)-limit:])
-					costs = costs[:limit]
-				}
-			})
-
-		case <-state.signals:
-			quitting = true
-
-			pool.Stop()
-			pool.Wait()
-
-			ctx.Unsaved = true
-			return nil
+			case <-quit:
+				close(test)
+				return
+			}
 		}
+	}()
+
+	go func() {
+		<-state.signals
+
+		quit <- struct{}{}
+		quitting = true
+
+		fmt.Print("^C")
+
+		ctx.Unsaved = true
+	}()
+
+	for cycle := range test {
+		print_screen(w, ctx, cycle)
+		if quitting {
+			fmt.Print("\r^C")
+		}
+
+		closed_for_test = false
 	}
+
+	return nil
+}
+
+func print_screen(w io.Writer, ctx *Context, cycle int) {
+	correct, cost := ctx.NeuralNetwork.Performance(ctx.Tests)
+
+	var b strings.Builder
+
+	fmt.Fprint(&b, "\033[1;1H\033[2J")
+	fmt.Fprintf(&b, "Cycle %d\n", cycle)
+	fmt.Fprintf(&b, "Learning rate: %f\n", ctx.LearningRate)
+
+	fmt.Fprint(&b, "\nTests:\n")
+	fmt.Fprintf(&b, "\tCorrect: %d/%d\n", correct, len(ctx.Tests))
+	fmt.Fprintf(&b, "\tCost: %f\n", cost)
+	fmt.Fprintf(&b, "\tError rate: %.2f%%\n", 100*(1-float64(correct)/float64(len(ctx.Tests))))
+
+	status := b.String()
+
+	wf, ok := w.(interface {
+		io.Writer
+		Fd() uintptr
+	})
+	if !ok {
+		fmt.Print(status)
+		return
+	}
+
+	width, height, err := term.GetSize(int(wf.Fd()))
+	if err != nil {
+		fmt.Print(status)
+		return
+	}
+
+	ctx.Evolution = append(ctx.Evolution, cost)
+
+	_, graph := Graph(ctx.Evolution, width, height-strings.Count(status, "\n"))
+	b.WriteString(graph)
+
+	fmt.Print(b.String())
 }
 
 func CommandStatus(state *State, w io.Writer, _ io.Reader, args ...string) error {
@@ -497,7 +488,7 @@ func CommandStatus(state *State, w io.Writer, _ io.Reader, args ...string) error
 	}
 
 	total := len(ctx.Tests)
-	correct, cost := ctx.NeuralNetwork.Cost(ctx.Tests)
+	correct, cost := ctx.NeuralNetwork.Performance(ctx.Tests)
 
 	fmt.Fprintf(w,
 		"Correct: %d\nIncorrect: %d\nTotal: %d\nPerformance: %.2f%%\n\nCost: %f\n",
@@ -580,13 +571,18 @@ func overwrite_loop(w io.Writer, r io.Reader, name string) (bool, error) {
 	}
 }
 
-func learn_batch(nn *nn.NeuralNetwork, dataset []nn.Sample, rate float64, size int) {
-	if size < len(dataset) {
-		offset := rand.IntN(len(dataset) - size)
-		dataset = dataset[offset : offset+size]
+func learn_batch(ctx *Context, size int) {
+	if ctx == nil {
+		return
 	}
 
-	nn.Learn(dataset, rate)
+	batch := ctx.Training
+	if size < len(batch) {
+		offset := rand.IntN(len(batch) - size)
+		batch = batch[offset : offset+size]
+	}
+
+	ctx.NeuralNetwork.Learn(batch, ctx.LearningRate)
 }
 
 func store_model(path string, nn *nn.NeuralNetwork) error {
